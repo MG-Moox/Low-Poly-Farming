@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>LOW POLY FARMING</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; overflow: hidden; background: #9bc8e8; font-family: Inter, system-ui, Arial, sans-serif; }
+  canvas { display: block; }
+  #hud { position: fixed; inset: 0; pointer-events: none; color: white; text-shadow: 0 2px 5px #183323; }
+  .panel { background: #14251dcc; border: 1px solid #ffffff30; border-radius: 14px; padding: 12px 16px; backdrop-filter: blur(8px); }
+  #brand { position: absolute; top: 18px; left: 18px; font-weight: 900; letter-spacing: 2px; font-size: 20px; }
+  #stats { position: absolute; top: 18px; right: 18px; text-align: right; min-width: 150px; }
+  #help { position: absolute; left: 18px; bottom: 18px; max-width: 330px; line-height: 1.6; font-size: 12px; }
+  #status { position: absolute; bottom: 22px; right: 20px; text-align: right; font-size: 13px; }
+  #crosshair { position: absolute; left: 50%; top: 50%; width: 5px; height: 5px; border-radius: 50%; background: #fff9; transform: translate(-50%,-50%); }
+  #message { position: absolute; top: 82px; left: 50%; transform: translateX(-50%); font-weight: 800; font-size: 14px; }
+  #start { position: fixed; inset: 0; z-index: 5; display: grid; place-items: center; background: linear-gradient(#14251d88,#14251dcc), radial-gradient(ellipse at center,#8fbd78,#294d36); color: white; }
+  #start .card { width: min(92vw, 520px); padding: 34px; text-align: center; background: #14251de8; border: 1px solid #ffffff35; border-radius: 22px; box-shadow: 0 25px 80px #0007; }
+  #start h1 { margin: 0 0 8px; font-size: clamp(34px,8vw,58px); line-height: .95; letter-spacing: -2px; }
+  #start p { color: #d3e4d1; line-height: 1.5; }
+  button { pointer-events: auto; border: 0; border-radius: 12px; padding: 13px 22px; font-weight: 800; font-size: 15px; color: #17311e; background: #c8ef83; cursor: pointer; }
+  button:hover { background: #dcff9d; transform: translateY(-1px); }
+  .small { color: #c7d9c7; font-size: 12px; }
+  @media (max-width: 650px) {
+    #brand { font-size: 15px; }
+    #help { max-width: 220px; font-size: 10px; }
+    #stats { font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+<div id="start">
+  <div class="card">
+    <h1>LOW POLY<br>FARMING</h1>
+    <p>Take a drive around your little corner of the countryside. Hop on the mower, lower the blades and tidy up the paddock.</p>
+    <button id="play">START FARMING</button>
+    <p class="small">WASD to drive · E to switch vehicle · F to toggle mower blades · C to change camera</p>
+  </div>
+</div>
+<div id="hud">
+  <div id="brand" class="panel">LOW POLY FARMING</div>
+  <div id="stats" class="panel">
+    <div id="vehicle">VEHICLE: RIDE-ON MOWER</div>
+    <div id="speed">SPEED: 0 km/h</div>
+    <div id="money">MONEY: $250</div>
+  </div>
+  <div id="message"></div>
+  <div id="crosshair"></div>
+  <div id="help" class="panel">
+    <b>CONTROLS</b><br>
+    W / S — Accelerate / reverse<br>
+    A / D — Steer · SPACE — Brake<br>
+    E — Switch vehicle · F — Mower blades<br>
+    C — Change camera · H — Headlights
+  </div>
+  <div id="status" class="panel">BLADES: <b id="blades">OFF</b><br>GRASS MOWN: <b id="mown">0%</b></div>
+</div>
+
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x9bc8e8);
+scene.fog = new THREE.Fog(0x9bc8e8, 65, 190);
+
+const camera = new THREE.PerspectiveCamera(65, innerWidth / innerHeight, 0.1, 400);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+
+scene.add(new THREE.HemisphereLight(0xdff3ff, 0x617b45, 2.0));
+const sun = new THREE.DirectionalLight(0xfff2d5, 2.2);
+sun.position.set(-45, 70, 35);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -90; sun.shadow.camera.right = 90;
+sun.shadow.camera.top = 90; sun.shadow.camera.bottom = -90;
+scene.add(sun);
+
+const mat = (color, roughness=1) => new THREE.MeshStandardMaterial({ color, roughness, flatShading: true });
+const grassMat = mat(0x79b957), darkGrass = mat(0x589346), dirtMat = mat(0x9b7950);
+const roadMat = mat(0xb4a080), woodMat = mat(0x805538), roofMat = mat(0x984d39);
+const whiteMat = mat(0xf2ead6), blackMat = mat(0x242a27), yellowMat = mat(0xe4b83f);
+const blueMat = mat(0x397fbd), glassMat = new THREE.MeshStandardMaterial({color:0x9bd5df, roughness:.25, metalness:.1});
+
+function box(parent, x,y,z, sx,sy,sz, material, cast=true) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz), material);
+  m.position.set(x,y,z); m.castShadow=cast; m.receiveShadow=true; parent.add(m); return m;
+}
+function cylinder(parent, x,y,z, r1,r2,h, material, segments=8, rotX=0) {
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(r1,r2,h,segments), material);
+  m.position.set(x,y,z); m.rotation.x=rotX; m.castShadow=true; m.receiveShadow=true; parent.add(m); return m;
+}
+
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(260,260,50,50), grassMat);
+ground.rotation.x=-Math.PI/2; ground.position.y=-.18; ground.receiveShadow=true; scene.add(ground);
+const hillMat = mat(0x6eaa58);
+for(let i=0;i<18;i++){
+  const a=i/18*Math.PI*2, r=75+(i%3)*12;
+  const hill=new THREE.Mesh(new THREE.IcosahedronGeometry(12+(i%4)*3,1),hillMat);
+  hill.position.set(Math.cos(a)*r, -3, Math.sin(a)*r); hill.scale.y=.45; hill.receiveShadow=true; scene.add(hill);
+}
+const lane = new THREE.Mesh(new THREE.PlaneGeometry(11,190), dirtMat);
+lane.rotation.x=-Math.PI/2; lane.position.set(0,.01,-12); scene.add(lane);
+const lane2 = new THREE.Mesh(new THREE.PlaneGeometry(105,8), dirtMat);
+lane2.rotation.x=-Math.PI/2; lane2.position.set(0,.015,26); scene.add(lane2);
+
+function fence(x1,z1,x2,z2, count=24){
+  for(let i=0;i<=count;i++){
+    const t=i/count, x=x1+(x2-x1)*t, z=z1+(z2-z1)*t;
+    box(scene,x,.55,z,.16,1.1,.16,woodMat);
+  }
+  for(const y of [.35,.8]){
+    const rail=box(scene,(x1+x2)/2,y,(z1+z2)/2,Math.hypot(x2-x1,z2-z1),.12,.12,whiteMat,false);
+    rail.rotation.y=-Math.atan2(z2-z1,x2-x1);
+  }
+}
+fence(-32,-34,32,-34); fence(-32,-34,-32,36); fence(32,-34,32,36); fence(-32,36,32,36);
+
+function tree(x,z,s=1){
+  const g=new THREE.Group(); g.position.set(x,0,z); g.scale.setScalar(s); scene.add(g);
+  cylinder(g,0,1.1,0,.28,.4,2.2,woodMat,6);
+  const crown=new THREE.Mesh(new THREE.ConeGeometry(1.6,3.2,7),mat(0x347d48));
+  crown.position.y=3; crown.castShadow=true; g.add(crown);
+  const crown2=new THREE.Mesh(new THREE.IcosahedronGeometry(1.05,1),mat(0x5b9d50));
+  crown2.position.set(.55,3.7,.15); crown2.castShadow=true; g.add(crown2);
+}
+for(let i=0;i<55;i++){
+  const x=(Math.random()-.5)*210, z=(Math.random()-.5)*210;
+  if(Math.abs(x)<39 && z>-40 && z<43) continue;
+  tree(x,z,.7+Math.random()*.8);
+}
+for(let i=0;i<260;i++){
+  const x=(Math.random()-.5)*65, z=(Math.random()-.5)*75;
+  if(Math.abs(x)<5 && z<32 && z>-100) continue;
+  const f=new THREE.Mesh(new THREE.SphereGeometry(.09,5,4),mat([0xffe07a,0xffffff,0xe98eaa][i%3]));
+  f.position.set(x,.15,z); scene.add(f);
+}
+
+function barn(x,z){
+  const g=new THREE.Group(); g.position.set(x,0,z); scene.add(g);
+  box(g,0,2,0,10,4,8,roofMat);
+  const roof=new THREE.Mesh(new THREE.ConeGeometry(7,3,4),mat(0x4c4140));
+  roof.rotation.y=Math.PI/4; roof.scale.set(1,.55,.8); roof.position.y=5; roof.castShadow=true; g.add(roof);
+  box(g,0,1.35,4.06,3.2,2.7,.15,woodMat);
+  box(g,-2.7,2.4,4.1,1.3,1.3,.12,whiteMat);
+  box(g,2.7,2.4,4.1,1.3,1.3,.12,whiteMat);
+}
+barn(19,-24);
+box(scene,19,1.1,-10,8,2.2,7,whiteMat);
+const houseRoof=new THREE.Mesh(new THREE.ConeGeometry(7,3,4),roofMat);
+houseRoof.rotation.y=Math.PI/4; houseRoof.scale.set(1,.55,.8); houseRoof.position.set(19,3.1,-10); scene.add(houseRoof);
+
+function makeVehicle(type){
+  const root=new THREE.Group();
+  const isTractor=type==='tractor';
+  const bodyMat=isTractor?greenPaint:yellowMat;
+  const wheels=[];
+  const wheelW=isTractor?.48:.3;
+  box(root,0,.78,0,isTractor?2.2:1.65,.35,isTractor?3.3:2.5,blackMat);
+  box(root,0,1.2,isTractor?-.15:.05,isTractor?1.9:1.5,isTractor?.75:.5,isTractor?2.2:1.8,bodyMat);
+  if(isTractor){
+    box(root,0,2.1,-.25,1.5,1.35,1.5,greenPaint);
+    box(root,0,2.05,-.98,1.28,1.05,.08,glassMat);
+    box(root,0,2.05,.49,1.28,1.05,.08,glassMat);
+    box(root,-.8,2.05,-.25,.08,1.1,1.45,greenPaint);
+    box(root,.8,2.05,-.25,.08,1.1,1.45,greenPaint);
+    box(root,0,1.25,-1.45,2.4,.2,.55,greenPaint);
+    cylinder(root,0,2.55,.8,.12,.12,.8,blackMat,8);
+  } else {
+    box(root,0,1.55,-.15,1.05,.65,1.05,yellowMat);
+    box(root,0,1.95,-.65,.9,.12,.7,blackMat);
+    box(root,0,.48,.72,1.75,.2,.9,yellowMat);
+    cylinder(root,0,.34,.72,.2,.2,.12,blackMat,8);
+    box(root,0,1.55,.45,.65,.25,.65,blackMat);
+    box(root,0,1.78,.72,.65,.65,.18,blackMat);
+  }
+  const wheelZ=isTractor?1.05:.78;
+  for(const side of [-1,1]){
+    for(const front of [-1,1]){
+      const z=front?-wheelZ:wheelZ;
+      const x=side*(isTractor?(front?.86:1.12):.78);
+      const r=isTractor?(front?.58:.88):.48;
+      const w=new THREE.Mesh(new THREE.CylinderGeometry(r,r,wheelW,10),blackMat);
+      w.rotation.z=Math.PI/2; w.position.set(x,r+.28,z); w.castShadow=true; root.add(w); wheels.push(w);
+      const hub=new THREE.Mesh(new THREE.CylinderGeometry(r*.38,r*.38,wheelW+.02,8),yellowMat);
+      hub.rotation.z=Math.PI/2; hub.position.copy(w.position); root.add(hub);
+    }
+  }
+  const steering=new THREE.Mesh(new THREE.TorusGeometry(.24,.035,6,12),blackMat);
+  steering.position.set(0,isTractor?2.05:1.8,.35); steering.rotation.x=.5; root.add(steering);
+  root.userData={wheels,steering,isTractor};
+  return root;
+}
+const greenPaint=mat(0x4f9b42);
+const mower=makeVehicle('mower'); scene.add(mower);
+const tractor=makeVehicle('tractor'); tractor.visible=false; scene.add(tractor);
+let active=mower, vehicleType='mower', blades=false, headlights=false, thirdPerson=true;
+let speed=0, steer=0, money=250, totalGrass=0, cutGrass=0;
+const keys={};
+addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;if([' ','arrowup','arrowdown','arrowleft','arrowright'].includes(e.key.toLowerCase()))e.preventDefault();});
+addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+const bladeGroup=new THREE.Group(); scene.add(bladeGroup);
+const bladeMat=mat(0xd7dce0);
+for(let i=0;i<3;i++){const b=box(bladeGroup,-.48+i*.48,.15,.8,.65,.035,.07,bladeMat);b.rotation.y=i*.7;}
+bladeGroup.visible=false;
+
+const grassTufts=[];
+const tuftGeo=new THREE.ConeGeometry(.13,.48,4);
+const tuftMat=mat(0x4d9a3e);
+const shortMat=mat(0x8dbb5d);
+const grassGroup=new THREE.Group(); scene.add(grassGroup);
+for(let i=0;i<2400;i++){
+  const x=(Math.random()-.5)*62, z=(Math.random()-.5)*68;
+  if(Math.abs(x)<5 && z<32 && z>-100) continue;
+  const m=new THREE.Mesh(tuftGeo,tuftMat);
+  m.position.set(x,.22,z); m.rotation.y=Math.random()*Math.PI; m.scale.y=.7+Math.random()*.9;
+  grassGroup.add(m); grassTufts.push({mesh:m,x,z,cut:false});
+}
+totalGrass=grassTufts.length;
+
+function switchVehicle(){
+  active.visible=false;
+  vehicleType=vehicleType==='mower'?'tractor':'mower';
+  active=vehicleType==='mower'?mower:tractor;
+  active.position.copy(vehicleType==='mower'?tractor.position:mower.position);
+  active.rotation.y=vehicleType==='mower'?tractor.rotation.y:mower.rotation.y;
+  active.visible=true; speed=0; blades=false; bladeGroup.visible=false;
+  document.getElementById('vehicle').textContent='VEHICLE: '+(vehicleType==='mower'?'RIDE-ON MOWER':'TRACTOR');
+  say(vehicleType==='mower'?'Ride-on mower selected':'Tractor selected');
+}
+function say(t){const el=document.getElementById('message');el.textContent=t;clearTimeout(say.timer);say.timer=setTimeout(()=>el.textContent='',1800);}
+addEventListener('keydown',e=>{
+  if(e.repeat)return;
+  if(e.key.toLowerCase()==='e')switchVehicle();
+  if(e.key.toLowerCase()==='f' && vehicleType==='mower'){blades=!blades;bladeGroup.visible=blades;say(blades?'Mower blades ON':'Mower blades OFF');}
+  if(e.key.toLowerCase()==='c')thirdPerson=!thirdPerson;
+  if(e.key.toLowerCase()==='h'){headlights=!headlights;say(headlights?'Headlights ON':'Headlights OFF');}
+});
+
+const clock=new THREE.Clock();
+let gameStarted=false;
+document.getElementById('play').onclick=()=>{document.getElementById('start').style.display='none';gameStarted=true;};
+const targetVec=new THREE.Vector3();
+function update(dt){
+  if(!gameStarted)return;
+  const forward=keys.w||keys.arrowup, reverse=keys.s||keys.arrowdown;
+  const braking=keys[' '];
+  const maxSpeed=vehicleType==='mower'?8:13;
+  if(forward)speed=Math.min(maxSpeed,speed+dt*(vehicleType==='mower'?5:7));
+  else if(reverse)speed=Math.max(-maxSpeed*.45,speed-dt*5);
+  else speed*=Math.pow(.90,dt*10);
+  if(braking)speed*=Math.pow(.08,dt*5);
+  const steerInput=(keys.a||keys.arrowleft?1:0)-(keys.d||keys.arrowright?1:0);
+  steer=THREE.MathUtils.damp(steer,steerInput,7,dt);
+  const turnFactor=Math.min(1,Math.abs(speed)/2);
+  active.rotation.y += steer*dt*1.8*turnFactor*(speed>=0?1:-1);
+  const dir=new THREE.Vector3(Math.sin(active.rotation.y),0,Math.cos(active.rotation.y));
+  active.position.addScaledVector(dir,speed*dt);
+  active.position.x=THREE.MathUtils.clamp(active.position.x,-115,115);
+  active.position.z=THREE.MathUtils.clamp(active.position.z,-115,115);
+  active.userData.wheels.forEach(w=>w.rotation.x+=speed*dt*1.5);
+  active.userData.steering.rotation.z=steer*.65;
+  if(vehicleType==='mower' && blades){
+    bladeGroup.position.set(active.position.x,0,active.position.z);
+    bladeGroup.rotation.y=active.rotation.y;
+    const deckX=active.position.x+Math.sin(active.rotation.y)*.75;
+    const deckZ=active.position.z+Math.cos(active.rotation.y)*.75;
+    for(const tuft of grassTufts){
+      if(tuft.cut)continue;
+      const dx=tuft.x-deckX, dz=tuft.z-deckZ;
+      const localX=dx*Math.cos(active.rotation.y)-dz*Math.sin(active.rotation.y);
+      const localZ=dx*Math.sin(active.rotation.y)+dz*Math.cos(active.rotation.y);
+      if(Math.abs(localX)<1.05 && Math.abs(localZ)<.72){
+        tuft.cut=true; tuft.mesh.scale.y=.22; tuft.mesh.position.y=.06;
+        tuft.mesh.material=shortMat; cutGrass++;
+      }
+    }
+  }
+  if(thirdPerson){
+    const behind=new THREE.Vector3(-Math.sin(active.rotation.y),0,-Math.cos(active.rotation.y)).multiplyScalar(8);
+    targetVec.copy(active.position).add(new THREE.Vector3(0,3.3,0));
+    const desired=active.position.clone().add(behind).add(new THREE.Vector3(0,4,0));
+    camera.position.lerp(desired,1-Math.pow(.001,dt));
+    camera.lookAt(targetVec);
+  }else{
+    const forwardVec=new THREE.Vector3(Math.sin(active.rotation.y),0,Math.cos(active.rotation.y));
+    camera.position.copy(active.position).add(new THREE.Vector3(0,2.0,0)).addScaledVector(forwardVec,.25);
+    camera.lookAt(active.position.clone().addScaledVector(forwardVec,12).add(new THREE.Vector3(0,1,0)));
+  }
+  document.getElementById('speed').textContent='SPEED: '+Math.round(Math.abs(speed)*3.6)+' km/h';
+  document.getElementById('money').textContent='MONEY: $'+money;
+  document.getElementById('blades').textContent=blades?'ON':'OFF';
+  document.getElementById('mown').textContent=Math.round(cutGrass/totalGrass*100)+'%';
+}
+function animate(){
+  requestAnimationFrame(animate);
+  const dt=Math.min(clock.getDelta(),.04);
+  update(dt);
+  renderer.render(scene,camera);
+}
+animate();
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+</script>
+</body>
+</html>
