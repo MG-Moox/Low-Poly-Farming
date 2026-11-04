@@ -69,7 +69,7 @@
     <p class="small">EARLY ACCESS • WORK IN PROGRESS</p>
   </div>
 </div>
-<div id="dealerShop"><div class="panel"><button id="shopClose">CLOSE ✕</button><div class="dealer-kicker">FARM EQUIPMENT • SALES & SERVICE</div><h2>TRACTOR & IMPLEMENT DEALERSHIP</h2><p>Browse the showroom and purchase machinery for your farm.</p><div class="stock"><div><b>Compact ride-on mower</b><small>Small mower for grass, verges and tidy-up jobs</small><b>$8,000</b></div><button id="buyMower">BUY MOWER</button></div><div class="shop-foot">More tractors, trailers and implements will be added as the game develops. Press U near the showroom to return here.</div></div></div>
+<div id="dealerShop"><div class="panel"><button id="shopClose">CLOSE ✕</button><div class="dealer-kicker">FARM EQUIPMENT • SALES & SERVICE</div><h2>TRACTOR & IMPLEMENT DEALERSHIP</h2><p>Browse the showroom and purchase machinery for your farm.</p><div class="stock"><div><b>Compact ride-on mower</b><small>Small mower for grass, verges and tidy-up jobs</small><b>$8,000</b></div><button id="buyMower">BUY MOWER</button></div><div class="stock"><div><b>Single-axle farm trailer</b><small>Attach it behind your tractor for a proper farm setup</small><b>$4,500</b></div><button id="buyTrailer">BUY TRAILER</button></div><div class="shop-foot">More tractors, trailers and implements will be added as the game develops. Press U near the showroom to return here.</div></div></div>
 <div id="hud">
   <div id="cash" class="glass"><b>$</b><span id="money">250</span></div>
   <div id="mission" class="glass"><strong>⚠ Harvest the Field</strong><span>• Cut 90% of the field</span><div class="bar"><div id="progress"></div></div><span id="mown">0%</span></div>
@@ -393,8 +393,29 @@ for(const x of [105,117]){
   const pad=new THREE.Mesh(new THREE.BoxGeometry(7,.18,7),mat(0x687477));pad.position.set(x,.18,-2.2);pad.receiveShadow=true;scene.add(pad);
   const stripe=box(scene,x,.29,1.15,5.8,.035,.12,yellowMat,false);
 }
+function makeTrailer(){
+  const g=new THREE.Group();
+  const steel=mat(0x343c40), trailerRed=mat(0x9e342b), metal=mat(0x929b9b);
+  box(g,0,1.02,1.25,2.35,.22,3.5,trailerRed);
+  box(g,-1.08,1.58,1.25,.12,1.05,3.5,trailerRed);
+  box(g,1.08,1.58,1.25,.12,1.05,3.5,trailerRed);
+  box(g,0,1.58,-.48,2.2,1.05,.12,trailerRed);
+  box(g,0,1.58,2.98,2.2,1.05,.12,trailerRed);
+  box(g,0,.78,-.78,.18,.18,1.35,steel);
+  box(g,0,.78,-1.38,.5,.12,.16,metal);
+  for(const side of [-1,1]){
+    const tyre=new THREE.Mesh(new THREE.CylinderGeometry(.48,.48,.32,18),steel);
+    tyre.rotation.z=Math.PI/2;tyre.position.set(side*1.2,.62,1.3);tyre.castShadow=true;g.add(tyre);
+    const hub=new THREE.Mesh(new THREE.CylinderGeometry(.2,.2,.35,12),metal);
+    hub.rotation.z=Math.PI/2;hub.position.copy(tyre.position);g.add(hub);
+    for(let i=0;i<6;i++){const rib=box(g,side*1.37,.62,1.3,.035,.08,.42,blackMat);rib.rotation.y=i*Math.PI/3;}
+  }
+  for(let i=0;i<5;i++)box(g,-.85+i*.425,2.12,1.25,.045,.045,3.35,metal,false);
+  return g;
+}
+const displayTrailer=makeTrailer();displayTrailer.position.set(111,0,-5.3);scene.add(displayTrailer);
 const tractor=makeVehicle('tractor'); scene.add(tractor);
-let mower=null, mowerOwned=false;
+let mower=null, mowerOwned=false, farmTrailer=null, trailerOwned=false;
 let active=tractor, vehicleType='tractor', blades=true, headlights=false, thirdPerson=true;
 let speed=0, steer=0, money=250, totalGrass=0, cutGrass=0;
 const keys={};
@@ -462,6 +483,7 @@ totalGrass=grassTufts.length;
 function say(t){const el=document.getElementById('message');el.textContent=t;clearTimeout(say.timer);say.timer=setTimeout(()=>el.textContent='',2200);}
 document.getElementById('shopClose').onclick=()=>document.getElementById('dealerShop').style.display='none';
 document.getElementById('buyMower').onclick=()=>{if(mowerOwned){say('You already own this mower');return;}if(money<8000){say('You need $'+(8000-money).toLocaleString()+' more');return;}money-=8000;mower=makeVehicle('mower');scene.add(mower);mower.position.copy(tractor.position);mower.rotation.copy(tractor.rotation);mowerOwned=true;active=mower;vehicleType='mower';blades=false;bladeGroup.visible=false;document.getElementById('buyMower').textContent='OWNED';document.getElementById('dealerShop').style.display='none';say('Mower purchased! You are now driving it.');};
+document.getElementById('buyTrailer').onclick=()=>{if(trailerOwned){say('You already own this trailer');return;}if(money<4500){say('You need $'+(4500-money).toLocaleString()+' more');return;}money-=4500;farmTrailer=makeTrailer();farmTrailer.position.set(0,0,3.35);tractor.add(farmTrailer);trailerOwned=true;document.getElementById('buyTrailer').textContent='OWNED';document.getElementById('dealerShop').style.display='none';say('Farm trailer purchased and hitched to your tractor!');};
 addEventListener('keydown',e=>{
   if(e.repeat)return;
   const key=e.key.toLowerCase();
@@ -479,7 +501,7 @@ addEventListener('keydown',e=>{
 });
 // Start parked inside the garage, lined up to drive west through the gate into the field.
 tractor.position.set(64,0,0);
-tractor.rotation.y = -Math.PI/2;
+tractor.rotation.y = Math.PI/2;
 const clock=new THREE.Clock();
 let gameStarted=false, menuTime=0;
 const menuShots=[
@@ -524,7 +546,7 @@ function update(dt){
   steer=THREE.MathUtils.damp(steer,steerInput,7,dt);
   const turnFactor=Math.min(1,Math.abs(speed)/2);
   active.rotation.y += steer*dt*1.8*turnFactor*(speed>=0?1:-1);
-  const dir=new THREE.Vector3(Math.sin(active.rotation.y),0,Math.cos(active.rotation.y));
+  const dir=new THREE.Vector3(-Math.sin(active.rotation.y),0,-Math.cos(active.rotation.y));
   active.position.addScaledVector(dir,speed*dt);
   active.position.x=THREE.MathUtils.clamp(active.position.x,-115,115);
   active.position.z=THREE.MathUtils.clamp(active.position.z,-115,115);
