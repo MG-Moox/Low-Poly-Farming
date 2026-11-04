@@ -138,6 +138,17 @@ fence(-48,-48,48,-48,48); fence(-48,-48,-48,48,48);
 // East-side fence has a wide vehicle gate aligned with the garage driveway.
 fence(48,-48,48,-10,19); fence(48,10,48,48,19); fence(-48,48,48,48,48);
 
+// Farm tracks lead from the garage to the dealership and each new field.
+function farmTrack(points,width=7){for(let i=0;i<points.length-1;i++){const [x1,z1]=points[i],[x2,z2]=points[i+1],dx=x2-x1,dz=z2-z1,len=Math.hypot(dx,dz);const road=new THREE.Mesh(new THREE.PlaneGeometry(width,len),mat(0x92704c));road.rotation.x=-Math.PI/2;road.rotation.z=Math.atan2(dx,dz);road.position.set((x1+x2)/2,.035,(z1+z2)/2);scene.add(road);}}
+farmTrack([[54,0],[70,-12],[88,-18],[105,-10],[111,0]]);
+farmTrack([[48,0],[38,17],[20,29],[0,39],[-22,44],[-55,47],[-82,20]]);
+farmTrack([[48,0],[53,-17],[42,-42],[22,-65],[0,-86]]);
+farmTrack([[48,0],[56,19],[47,43],[25,68],[0,86]]);
+farmTrack([[48,0],[70,20],[84,45],[83,66]]);
+// Tractor and implement dealership at the end of the eastern track.
+const dealer=new THREE.Group();dealer.position.set(111,0,0);scene.add(dealer);
+box(dealer,0,.12,0,25,.24,19,mat(0x77766d));box(dealer,0,3,0,24,6,18,mat(0xd8d0bd));box(dealer,0,6.2,0,26,.5,20,mat(0x343b42));
+box(dealer,0,2.8,9.15,13,5.2,.12,glassMat);box(dealer,0,5.2,9.3,16,1.1,.2,blackMat);
 // Trees
 function tree(x,z,s=1){
   const g=new THREE.Group(); g.position.set(x,0,z); g.scale.setScalar(s); scene.add(g);
@@ -267,7 +278,8 @@ function makeVehicle(type){
   return root;
 }
 const greenPaint=mat(0x4f9b42);
-const redPaint=mat(0xd9362e);
+const redPaint=new THREE.MeshStandardMaterial({color:0xd9362e,roughness:.2,metalness:.5,envMapIntensity:1.5});
+const glassMat=new THREE.MeshPhysicalMaterial({color:0x9bd5df,roughness:.08,metalness:.05,transparent:true,opacity:.3,transmission:.75,thickness:.12,depthWrite:false,side:THREE.DoubleSide});
 const tractor=makeVehicle('tractor'); scene.add(tractor);
 let active=tractor, vehicleType='tractor', blades=true, headlights=false, thirdPerson=true;
 let speed=0, steer=0, money=250, totalGrass=0, cutGrass=0;
@@ -288,7 +300,7 @@ bladeGroup.visible=true;
 // A tightly packed, continuous wheat field rendered as instances for smooth performance.
 const grassTufts=[];
 const tuftGeo=new THREE.ConeGeometry(.20,1.05,5);
-const wheatInstances=new THREE.InstancedMesh(tuftGeo, wheatMat, 118*118);
+const wheatInstances=new THREE.InstancedMesh(tuftGeo, wheatMat, 118*118 + 4*46*46);
 wheatInstances.castShadow=false; wheatInstances.receiveShadow=true; scene.add(wheatInstances);
 const cropDummy=new THREE.Object3D();
 const shortMat=cutWheatMat;
@@ -303,8 +315,29 @@ for(let ix=0;ix<118;ix++){
     cropDummy.rotation.set(0,Math.random()*Math.PI,0);
     cropDummy.scale.set(1,scale,1);
     cropDummy.updateMatrix(); wheatInstances.setMatrixAt(index,cropDummy.matrix);
-    grassTufts.push({index,x,z,scale,cut:false});
+    grassTufts.push({index,x,z,scale,cut:false,field:null});
   }
+}
+wheatInstances.instanceMatrix.needsUpdate=true;
+// Four extra crop plots, each with its own unlock price.
+const extraFields=[
+{name:'West Meadow',x:-82,z:0,size:34,cost:1800,unlocked:false},
+{name:'North Wheat',x:0,z:-103,size:34,cost:4500,unlocked:false},
+{name:'South Barley',x:0,z:103,size:34,cost:8500,unlocked:false},
+{name:'East Canola',x:83,z:83,size:34,cost:14000,unlocked:false}
+];
+let nextCropIndex=118*118;
+for(const field of extraFields){
+ const soil=new THREE.Mesh(new THREE.PlaneGeometry(field.size+4,field.size+4),mat(0x8c7845));soil.rotation.x=-Math.PI/2;soil.position.set(field.x,-.045,field.z);scene.add(soil);
+ const edge=new THREE.Mesh(new THREE.PlaneGeometry(field.size+7,field.size+7),mat(0x65984a));edge.rotation.x=-Math.PI/2;edge.position.set(field.x,-.08,field.z);scene.add(edge);
+ const sign=new THREE.Group();sign.position.set(field.x,0,field.z+field.size/2+3);scene.add(sign);
+ box(sign,0,1.5,0,.22,3,.22,woodMat);box(sign,0,3,0,5,1.5,.25,blackMat);
+ for(let ix=0;ix<46;ix++)for(let iz=0;iz<46;iz++){
+  const x=field.x-field.size/2+ix*(field.size/46)+.2,z=field.z-field.size/2+iz*(field.size/46)+.2;
+  const scale=.85+Math.random()*.3,index=nextCropIndex++;
+  cropDummy.position.set(x,.52*scale,z);cropDummy.rotation.set(0,Math.random()*Math.PI,0);cropDummy.scale.set(1,scale,1);cropDummy.updateMatrix();wheatInstances.setMatrixAt(index,cropDummy.matrix);
+  grassTufts.push({index,x,z,scale,cut:false,field});
+ }
 }
 wheatInstances.instanceMatrix.needsUpdate=true;
 totalGrass=grassTufts.length;
@@ -312,7 +345,9 @@ totalGrass=grassTufts.length;
 function say(t){const el=document.getElementById('message');el.textContent=t;clearTimeout(say.timer);say.timer=setTimeout(()=>el.textContent='',1800);}
 addEventListener('keydown',e=>{
   if(e.repeat)return;
-  if(e.key.toLowerCase()==='f'){
+  if(e.key.toLowerCase()==='u'){
+ const field=extraFields.find(f=>Math.hypot(active.position.x-f.x,active.position.z-(f.z+f.size/2+3))<15);
+ if(field){if(field.unlocked)say(field.name+' already unlocked');else if(money>=field.cost){money-=field.cost;field.unlocked=true;say(field.name+' unlocked!');}else say('Need 
     blades=!blades; bladeGroup.visible=blades;
     say(blades?'Rear harvester lowered':'Rear harvester raised');
   }
@@ -357,14 +392,104 @@ function update(dt){
     const deckX=active.position.x-Math.sin(active.rotation.y)*2.65;
     const deckZ=active.position.z-Math.cos(active.rotation.y)*2.65;
     for(const tuft of grassTufts){
-      if(tuft.cut)continue;
+      if(tuft.cut || (tuft.field && !tuft.field.unlocked))continue;
       const dx=tuft.x-deckX, dz=tuft.z-deckZ;
       const localX=dx*Math.cos(active.rotation.y)-dz*Math.sin(active.rotation.y);
       const localZ=dx*Math.sin(active.rotation.y)+dz*Math.cos(active.rotation.y);
       if(Math.abs(localX)<2.9 && Math.abs(localZ)<.72){
         tuft.cut=true;
         cropDummy.position.set(tuft.x,.055,tuft.z); cropDummy.rotation.set(0,0,0); cropDummy.scale.set(1,.10,1); cropDummy.updateMatrix();
-        wheatInstances.setMatrixAt(tuft.index,cropDummy.matrix); wheatInstances.instanceMatrix.needsUpdate=true;
+        tuft.mesh?.setMatrixAt(tuft.index,cropDummy.matrix); wheatInstances.setMatrixAt(tuft.index,cropDummy.matrix); wheatInstances.instanceMatrix.needsUpdate=true;
+        cutGrass++; money += 2;
+      }
+    }
+  }
+  const orbitAngle=active.rotation.y+orbitYaw+Math.PI;
+  const horizontal=Math.cos(orbitPitch)*orbitDistance;
+  const desired=new THREE.Vector3(
+    active.position.x+Math.sin(orbitAngle)*horizontal,
+    active.position.y+2.4+Math.sin(orbitPitch)*orbitDistance,
+    active.position.z+Math.cos(orbitAngle)*horizontal
+  );
+  camera.position.lerp(desired,1-Math.pow(.0005,dt));
+  targetVec.copy(active.position).add(new THREE.Vector3(0,1.6,0));
+  camera.lookAt(targetVec);
+  document.getElementById('speed').textContent=Math.round(Math.abs(speed)*3.6);
+  document.getElementById('money').textContent=money.toLocaleString();
+  const pct=Math.round(cutGrass/totalGrass*100);
+  document.getElementById('mown').textContent=pct+'%';
+  document.getElementById('progress').style.width=pct+'%';
+  document.getElementById('rpm').textContent='RPM '+Math.round(900+Math.abs(speed)*110);
+  document.getElementById('mapplayer').style.transform='rotate('+(-active.rotation.y*180/Math.PI)+'deg)';
+
+}
+function animate(){
+  requestAnimationFrame(animate);
+  const dt=Math.min(clock.getDelta(),.04);
+  update(dt);
+  renderer.render(scene,camera);
+}
+animate();
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+</script>
+</body>
+</html>+(field.cost-money).toLocaleString()+' more for '+field.name);}
+ else if(Math.hypot(active.position.x-111,active.position.z)<22)say('Tractor & implement dealership — coming soon!');
+ else say('Drive to a field gate and press U to unlock it');
+}
+if(e.key.toLowerCase()==='f'){
+    blades=!blades; bladeGroup.visible=blades;
+    say(blades?'Rear harvester lowered':'Rear harvester raised');
+  }
+  if(e.key.toLowerCase()==='c'){thirdPerson=!thirdPerson;orbitYaw=0;orbitPitch=.32;orbitDistance=13;}
+});
+
+// Start parked inside the garage, lined up to drive west through the gate into the field.
+tractor.position.set(64,0,0);
+tractor.rotation.y = -Math.PI/2;
+const clock=new THREE.Clock();
+let gameStarted=false;
+document.getElementById('play').onclick=()=>{document.getElementById('start').style.display='none';gameStarted=true;};
+const targetVec=new THREE.Vector3();
+let orbitYaw=0, orbitPitch=0.32, orbitDistance=13, dragging=false, lastPointerX=0, lastPointerY=0;
+renderer.domElement.style.cursor='grab';
+renderer.domElement.addEventListener('pointerdown',e=>{dragging=true;lastPointerX=e.clientX;lastPointerY=e.clientY;renderer.domElement.setPointerCapture(e.pointerId);renderer.domElement.style.cursor='grabbing';});
+renderer.domElement.addEventListener('pointermove',e=>{if(!dragging)return;orbitYaw-=(e.clientX-lastPointerX)*.006;orbitPitch=THREE.MathUtils.clamp(orbitPitch+(e.clientY-lastPointerY)*.004,-.15,1.05);lastPointerX=e.clientX;lastPointerY=e.clientY;});
+renderer.domElement.addEventListener('pointerup',()=>{dragging=false;renderer.domElement.style.cursor='grab';});
+renderer.domElement.addEventListener('wheel',e=>{orbitDistance=THREE.MathUtils.clamp(orbitDistance+e.deltaY*.015,6,28);},{passive:true});
+
+function update(dt){
+  if(!gameStarted)return;
+  const forward=keys.w||keys.arrowup, reverse=keys.s||keys.arrowdown;
+  const braking=keys[' '];
+  const maxSpeed=13;
+  if(forward)speed=Math.min(maxSpeed,speed+dt*7);
+  else if(reverse)speed=Math.max(-maxSpeed*.45,speed-dt*5);
+  else speed*=Math.pow(.90,dt*10);
+  if(braking)speed*=Math.pow(.08,dt*5);
+  const steerInput=(keys.a||keys.arrowleft?1:0)-(keys.d||keys.arrowright?1:0);
+  steer=THREE.MathUtils.damp(steer,steerInput,7,dt);
+  const turnFactor=Math.min(1,Math.abs(speed)/2);
+  active.rotation.y += steer*dt*1.8*turnFactor*(speed>=0?1:-1);
+  const dir=new THREE.Vector3(Math.sin(active.rotation.y),0,Math.cos(active.rotation.y));
+  active.position.addScaledVector(dir,speed*dt);
+  active.position.x=THREE.MathUtils.clamp(active.position.x,-115,115);
+  active.position.z=THREE.MathUtils.clamp(active.position.z,-115,115);
+  active.userData.wheels.forEach(w=>w.rotation.x+=speed*dt*1.5);
+  active.userData.steering.rotation.z=steer*.65;
+  if(blades){
+    // Harvest the wide strip directly behind the tractor's rear attachment.
+    const deckX=active.position.x-Math.sin(active.rotation.y)*2.65;
+    const deckZ=active.position.z-Math.cos(active.rotation.y)*2.65;
+    for(const tuft of grassTufts){
+      if(tuft.cut || (tuft.field && !tuft.field.unlocked))continue;
+      const dx=tuft.x-deckX, dz=tuft.z-deckZ;
+      const localX=dx*Math.cos(active.rotation.y)-dz*Math.sin(active.rotation.y);
+      const localZ=dx*Math.sin(active.rotation.y)+dz*Math.cos(active.rotation.y);
+      if(Math.abs(localX)<2.9 && Math.abs(localZ)<.72){
+        tuft.cut=true;
+        cropDummy.position.set(tuft.x,.055,tuft.z); cropDummy.rotation.set(0,0,0); cropDummy.scale.set(1,.10,1); cropDummy.updateMatrix();
+        tuft.mesh?.setMatrixAt(tuft.index,cropDummy.matrix); wheatInstances.setMatrixAt(tuft.index,cropDummy.matrix); wheatInstances.instanceMatrix.needsUpdate=true;
         cutGrass++; money += 2;
       }
     }
