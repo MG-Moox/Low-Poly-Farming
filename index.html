@@ -114,7 +114,7 @@ const wheatMat = new THREE.MeshStandardMaterial({color:0xe6b83f,roughness:.88,fl
 const wheatTipMat = mat(0xf4d36b), cutWheatMat = mat(0x9b8647);
 const roadMat = mat(0xb4a080), woodMat = mat(0x805538), roofMat = mat(0x984d39);
 const whiteMat = mat(0xf2ead6), blackMat = mat(0x242a27), yellowMat = mat(0xe4b83f);
-const blueMat = mat(0x397fbd), glassMat = new THREE.MeshStandardMaterial({color:0x9bd5df, roughness:.25, metalness:.1});
+const blueMat = mat(0x397fbd), glassMat = new THREE.MeshPhysicalMaterial({color:0x9bd5df,roughness:.08,metalness:.05,transparent:true,opacity:.3,transmission:.75,thickness:.12,depthWrite:false,side:THREE.DoubleSide});
 
 function box(parent, x,y,z, sx,sy,sz, material, cast=true) {
   const m = new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz), material);
@@ -306,7 +306,7 @@ function makeVehicle(type){
 const greenPaint=mat(0x4f9b42);
 const redPaint=new THREE.MeshStandardMaterial({color:0xd9362e,roughness:.28,metalness:.22,envMapIntensity:1.5});
 
-const glassMat=new THREE.MeshPhysicalMaterial({color:0x9bd5df,roughness:.08,metalness:.05,transparent:true,opacity:.3,transmission:.75,thickness:.12,depthWrite:false,side:THREE.DoubleSide});
+// Glass material is declared once with the farm materials above.
 const tractor=makeVehicle('tractor'); scene.add(tractor);
 let active=tractor, vehicleType='tractor', blades=true, headlights=false, thirdPerson=true;
 let speed=0, steer=0, money=250, totalGrass=0, cutGrass=0;
@@ -523,7 +523,7 @@ function update(dt){
         tuft.cut=true;
         cropDummy.position.set(tuft.x,.055,tuft.z); cropDummy.rotation.set(0,0,0); cropDummy.scale.set(1,.10,1); cropDummy.updateMatrix();
         tuft.mesh?.setMatrixAt(tuft.index,cropDummy.matrix); wheatInstances.setMatrixAt(tuft.index,cropDummy.matrix); wheatInstances.instanceMatrix.needsUpdate=true;
-        cutGrass++; money += 2;
+        cutGrass++; money += 8;
       }
     }
   }
