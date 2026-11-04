@@ -32,8 +32,14 @@
   #fuelbar{height:75%;width:100%;background:#16e447;border-radius:5px}
   #message{position:absolute;top:45%;left:50%;transform:translate(-50%,-50%);font-size:20px}
   #hud{display:none}
-  #dealerShop{position:fixed;inset:0;z-index:8;display:none;align-items:center;justify-content:center;background:#071017b8;color:#fff}
-  #dealerShop .panel{width:min(92vw,620px);padding:28px;background:linear-gradient(145deg,#17242a,#26373b);border:1px solid #ffffff40;border-top:4px solid #a6df42;border-radius:14px;box-shadow:0 24px 80px #0009}
+  #dealerShop{position:fixed;inset:0;z-index:8;display:none;align-items:center;justify-content:center;background:rgba(5,12,16,.48);backdrop-filter:blur(3px);color:#fff}
+  #dealerShop .panel{width:min(92vw,720px);max-height:88vh;overflow:auto;padding:30px;background:linear-gradient(145deg,#17272b,#24383a);border:1px solid #ffffff45;border-top:4px solid #a6df42;border-radius:14px;box-shadow:0 24px 80px #0009}
+  #dealerShop .stock{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center;padding:18px 0;border-top:1px solid #ffffff25}
+  #dealerShop .stock small{display:block;color:#c2d1cc;margin-top:5px}
+  #dealerShop .dealer-kicker{color:#b8e56b;font-size:11px;font-weight:900;letter-spacing:3px;margin-bottom:8px}
+  #dealerShop .stock button{min-width:150px}
+  #dealerShop .shop-foot{font-size:12px;color:#c2d1cc;margin-top:16px}
+  @media(max-width:600px){#dealerShop .stock{grid-template-columns:1fr}#dealerShop .stock button{width:100%}}
   #dealerShop h2{font-size:28px;margin:0 0 8px}#dealerShop p{color:#cbd6d2}
   .shopitem{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 0;border-top:1px solid #ffffff25}
   #shopClose{float:right;background:#35464a;color:white;padding:8px 13px}
@@ -63,7 +69,7 @@
     <p class="small">EARLY ACCESS • WORK IN PROGRESS</p>
   </div>
 </div>
-<div id="dealerShop"><div class="panel"><button id="shopClose">CLOSE ✕</button><h2>TRACTOR & IMPLEMENT DEALERSHIP</h2><p>Buy machinery for your farm. Your purchases are added to your equipment.</p><div class="shopitem"><div><b>Compact ride-on mower</b><br><span class="small">A smaller machine for grass and field edges</span><br><b>$8,000</b></div><button id="buyMower">BUY MOWER</button></div><p class="small">Drive close to the dealership and press U to open this shop.</p></div></div>
+<div id="dealerShop"><div class="panel"><button id="shopClose">CLOSE ✕</button><div class="dealer-kicker">FARM EQUIPMENT • SALES & SERVICE</div><h2>TRACTOR & IMPLEMENT DEALERSHIP</h2><p>Browse the showroom and purchase machinery for your farm.</p><div class="stock"><div><b>Compact ride-on mower</b><small>Small mower for grass, verges and tidy-up jobs</small><b>$8,000</b></div><button id="buyMower">BUY MOWER</button></div><div class="shop-foot">More tractors, trailers and implements will be added as the game develops. Press U near the showroom to return here.</div></div></div>
 <div id="hud">
   <div id="cash" class="glass"><b>$</b><span id="money">250</span></div>
   <div id="mission" class="glass"><strong>⚠ Harvest the Field</strong><span>• Cut 90% of the field</span><div class="bar"><div id="progress"></div></div><span id="mown">0%</span></div>
@@ -200,10 +206,41 @@ farmTrack([[48,0],[38,17],[20,29],[0,39],[-22,44],[-55,47],[-82,20]]);
 farmTrack([[48,0],[53,-17],[42,-42],[22,-65],[0,-86]]);
 farmTrack([[48,0],[56,19],[47,43],[25,68],[0,86]]);
 farmTrack([[48,0],[70,20],[84,45],[83,66]]);
-// Tractor and implement dealership at the end of the eastern track.
+// Full machinery showroom: concrete forecourt, open glass-fronted sales floor and a proper roof.
 const dealer=new THREE.Group();dealer.position.set(111,0,0);scene.add(dealer);
-box(dealer,0,.12,0,25,.24,19,mat(0x77766d));box(dealer,0,3,0,24,6,18,mat(0xd8d0bd));box(dealer,0,6.2,0,26,.5,20,mat(0x343b42));
-box(dealer,0,2.8,9.15,13,5.2,.12,glassMat);box(dealer,0,5.2,9.3,16,1.1,.2,blackMat);
+const dealerConcrete=mat(0x777d7b),dealerWall=mat(0xd6d9d2),dealerDark=mat(0x303b40),dealerFrame=mat(0x46565a);
+box(dealer,0,.12,0,30,.24,24,dealerConcrete,false);
+box(dealer,0,.28,-1,25,.12,17,mat(0xb7b9b2),false); // polished showroom floor
+// Solid rear and side walls; the front is deliberately open for a wide glass entrance.
+box(dealer,0,3,-9.3,25,6,.45,dealerWall);
+box(dealer,-12.3,3,-.2,.45,6,18,dealerWall);
+box(dealer,12.3,3,-.2,.45,6,18,dealerWall);
+box(dealer,-8.5,3,8.65,7.5,6,.35,dealerWall);
+box(dealer,8.5,3,8.65,7.5,6,.35,dealerWall);
+// Tall front showroom glazing and dark aluminium mullions.
+for(const x of [-4.5,4.5]){
+  const pane=new THREE.Mesh(new THREE.PlaneGeometry(7.1,4.8),glassMat);pane.position.set(x,3.05,8.43);dealer.add(pane);
+  for(const dx of [-3.5,0,3.5])box(dealer,x+dx,3.05,8.5,.09,4.9,.12,dealerFrame,false);
+  box(dealer,x,5.48,8.5,7.1,.1,.12,dealerFrame,false);
+  box(dealer,x,0.62,8.5,7.1,.12,.12,dealerFrame,false);
+}
+// Entry pillars, canopy, roof and fascia.
+for(const x of [-12,0,12])box(dealer,x,3,8.75,.38,6.1,.42,dealerFrame);
+box(dealer,0,6.15,0,26,.5,20,dealerDark);
+box(dealer,0,5.88,9.15,26,.35,.45,mat(0xa6df42));
+box(dealer,0,6.65,10.15,13,1.05,.42,dealerDark);
+// Sign panel faces the approach road.
+const signCanvas=document.createElement('canvas');signCanvas.width=1024;signCanvas.height=256;
+const signCtx=signCanvas.getContext('2d');signCtx.fillStyle='#26383b';signCtx.fillRect(0,0,1024,256);
+signCtx.fillStyle='#a6df42';signCtx.fillRect(0,226,1024,30);
+signCtx.fillStyle='#ffffff';signCtx.font='900 76px Arial';signCtx.textAlign='center';signCtx.fillText('FARM EQUIPMENT',512,112);
+signCtx.fillStyle='#c6d5ce';signCtx.font='700 30px Arial';signCtx.fillText('TRACTORS  •  IMPLEMENTS  •  SERVICE',512,170);
+const signTexture=new THREE.CanvasTexture(signCanvas);signTexture.colorSpace=THREE.SRGBColorSpace;
+const signFace=new THREE.Mesh(new THREE.PlaneGeometry(12.7,.98),new THREE.MeshBasicMaterial({map:signTexture}));
+signFace.position.set(0,6.65,10.38);dealer.add(signFace);
+// Showroom ceiling lights and exterior bollards.
+for(const x of [-8,0,8]){const light=new THREE.PointLight(0xffedcf,2.1,22);light.position.set(x,5.25,0);dealer.add(light);const fitting=new THREE.Mesh(new THREE.BoxGeometry(1.6,.12,.45),whiteMat);fitting.position.set(x,5.85,0);dealer.add(fitting);}
+for(const x of [-14,-10,10,14]){const post=new THREE.Mesh(new THREE.CylinderGeometry(.16,.2,.85,12),yellowMat);post.position.set(x,.43,11.5);dealer.add(post);}
 // Trees
 function tree(x,z,s=1){
   const g=new THREE.Group(); g.position.set(x,0,z); g.scale.setScalar(s); scene.add(g);
@@ -348,7 +385,14 @@ function makeVehicle(type){
 const greenPaint=mat(0x4f9b42);
 const redPaint=new THREE.MeshStandardMaterial({color:0xd9362e,roughness:.28,metalness:.22,envMapIntensity:1.5});
 
-// Glass material is declared once with the farm materials above.
+// Parked display machinery inside the dealership showroom.
+const displayTractor=makeVehicle('tractor');displayTractor.position.set(105,0,-2.2);displayTractor.rotation.y=Math.PI;scene.add(displayTractor);
+const displayMower=makeVehicle('mower');displayMower.position.set(117,0,-2.2);displayMower.rotation.y=Math.PI;scene.add(displayMower);
+// Raised display pads, floor markings and showroom spotlights.
+for(const x of [105,117]){
+  const pad=new THREE.Mesh(new THREE.BoxGeometry(7,.18,7),mat(0x687477));pad.position.set(x,.18,-2.2);pad.receiveShadow=true;scene.add(pad);
+  const stripe=box(scene,x,.29,1.15,5.8,.035,.12,yellowMat,false);
+}
 const tractor=makeVehicle('tractor'); scene.add(tractor);
 let mower=null, mowerOwned=false;
 let active=tractor, vehicleType='tractor', blades=true, headlights=false, thirdPerson=true;
