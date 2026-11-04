@@ -74,7 +74,7 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.m
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xf5a16b);
-scene.fog = new THREE.Fog(0xe99a72, 115, 290);
+scene.fog = null; // Keep distant fields and hills crisp; no orange distance fog.
 
 const camera = new THREE.PerspectiveCamera(65, innerWidth / innerHeight, 0.1, 400);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -84,38 +84,59 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.18;
+renderer.toneMappingExposure = 1.08;
 document.body.appendChild(renderer.domElement);
 
-// Visual polish: a layered sky gradient, soft cloud banks, atmospheric lighting and richer shadows.
-const skyCanvas=document.createElement('canvas');skyCanvas.width=2;skyCanvas.height=256;
+// Clear outdoor skybox with painted cloud formations and separate 3D cloud banks.
+const skyCanvas=document.createElement('canvas');skyCanvas.width=2048;skyCanvas.height=1024;
 const skyCtx=skyCanvas.getContext('2d');
-const skyGrad=skyCtx.createLinearGradient(0,0,0,256);
-skyGrad.addColorStop(0,'#4778a8');skyGrad.addColorStop(.48,'#a8c8d5');skyGrad.addColorStop(.78,'#f6c18b');skyGrad.addColorStop(1,'#e99465');
-skyCtx.fillStyle=skyGrad;skyCtx.fillRect(0,0,2,256);
-const skyTex=new THREE.CanvasTexture(skyCanvas);skyTex.colorSpace=THREE.SRGBColorSpace;
-const skyDome=new THREE.Mesh(new THREE.SphereGeometry(380,32,20),new THREE.MeshBasicMaterial({map:skyTex,side:THREE.BackSide,depthWrite:false}));
-scene.add(skyDome);scene.background=null;
-const cloudMat=new THREE.MeshStandardMaterial({color:0xffe4cf,roughness:1,transparent:true,opacity:.82,flatShading:true});
-for(let i=0;i<24;i++){
- const cloud=new THREE.Group();cloud.position.set(-150+Math.random()*300,42+Math.random()*30,-150+Math.random()*300);cloud.scale.setScalar(1.2+Math.random()*2);scene.add(cloud);
- for(let j=0;j<5;j++){const puff=new THREE.Mesh(new THREE.IcosahedronGeometry(2.2+Math.random()*1.8,1),cloudMat);puff.position.set((j-2)*2.2,Math.random()*1.3,Math.random()*1.4);cloud.add(puff);}
+const skyGrad=skyCtx.createLinearGradient(0,0,0,1024);
+skyGrad.addColorStop(0,'#2463a0');skyGrad.addColorStop(.34,'#5d9fd0');skyGrad.addColorStop(.68,'#b8d9e8');skyGrad.addColorStop(1,'#e4eff0');
+skyCtx.fillStyle=skyGrad;skyCtx.fillRect(0,0,2048,1024);
+// Soft cloud layers painted into the skybox so the whole horizon has real sky detail.
+let seed=92741;const rand=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
+for(let layer=0;layer<3;layer++){
+  const yBase=350+layer*125;
+  for(let i=0;i<42;i++){
+    const x=rand()*2048,y=yBase+(rand()-.5)*115,w=65+rand()*150,h=15+rand()*34;
+    skyCtx.save();skyCtx.globalAlpha=.16+rand()*.2;skyCtx.filter='blur('+(12+rand()*18)+'px)';
+    skyCtx.fillStyle=layer===0?'#ffffff':'#f7fbff';
+    skyCtx.beginPath();skyCtx.ellipse(x,y,w,h,0,0,Math.PI*2);skyCtx.fill();
+    for(let p=0;p<5;p++){skyCtx.beginPath();skyCtx.ellipse(x+(rand()-.5)*w,y-8-rand()*22,w*(.22+rand()*.22),h*(.8+rand()*.8),0,0,Math.PI*2);skyCtx.fill();}
+    skyCtx.restore();
+  }
 }
-renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+const skyTex=new THREE.CanvasTexture(skyCanvas);skyTex.colorSpace=THREE.SRGBColorSpace;
+skyTex.mapping=THREE.EquirectangularReflectionMapping;
+const skyDome=new THREE.Mesh(new THREE.SphereGeometry(380,48,32),new THREE.MeshBasicMaterial({map:skyTex,side:THREE.BackSide,depthWrite:false,fog:false}));
+scene.add(skyDome);scene.background=null;
+// Large, soft 3D cloud formations add depth against the skybox.
+const cloudMat=new THREE.MeshStandardMaterial({color:0xffffff,roughness:1,transparent:true,opacity:.92,flatShading:false});
+for(let i=0;i<32;i++){
+ const cloud=new THREE.Group();cloud.position.set(-190+Math.random()*380,48+Math.random()*35,-190+Math.random()*380);cloud.scale.set(1.5+Math.random()*2.4, .75+Math.random()*.55,1.5+Math.random()*2.4);scene.add(cloud);
+ const puffs=7+Math.floor(Math.random()*6);
+ for(let j=0;j<puffs;j++){
+  const radius=2.8+Math.random()*3.8;
+  const puff=new THREE.Mesh(new THREE.SphereGeometry(radius,12,9),cloudMat);
+  puff.position.set((Math.random()-.5)*15,Math.random()*2.2,(Math.random()-.5)*8);
+  puff.scale.y=.42+Math.random()*.28;puff.castShadow=false;puff.receiveShadow=false;cloud.add(puff);
+ }
+}
 
 
-scene.add(new THREE.HemisphereLight(0xffd6b0, 0x4c5837, 1.35));
-const sun = new THREE.DirectionalLight(0xffb36b, 3.2);
-sun.position.set(-45, 55, 55);
+
+scene.add(new THREE.HemisphereLight(0xd9edff, 0x61754b, 1.75));
+const sun = new THREE.DirectionalLight(0xfff1d5, 3.0);
+sun.position.set(-45, 85, 35);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
 sun.shadow.camera.left = -90; sun.shadow.camera.right = 90;
 sun.shadow.camera.top = 90; sun.shadow.camera.bottom = -90;
 scene.add(sun);
 sun.castShadow=true;sun.shadow.bias=-0.00015;sun.shadow.normalBias=.025;sun.shadow.radius=4;
-const sunBall = new THREE.Mesh(new THREE.SphereGeometry(7,32,24), new THREE.MeshBasicMaterial({color:0xffd36a}));
-sunBall.position.set(-42,34,105); scene.add(sunBall);
-const sunGlow = new THREE.PointLight(0xff9a4d, 2.2, 180); sunGlow.position.copy(sunBall.position); scene.add(sunGlow);
+const sunBall = new THREE.Mesh(new THREE.SphereGeometry(7,32,24), new THREE.MeshBasicMaterial({color:0xfff2c2}));
+sunBall.position.set(-85,75,95); scene.add(sunBall);
+const sunGlow = new THREE.PointLight(0xffdfaa, 1.0, 150); sunGlow.position.copy(sunBall.position); scene.add(sunGlow);
 
 const mat = (color, roughness=1) => new THREE.MeshStandardMaterial({ color, roughness, flatShading: true });
 const grassMat = mat(0x79b957), darkGrass = mat(0x589346), dirtMat = mat(0x9b7950);
