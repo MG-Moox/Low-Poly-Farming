@@ -134,7 +134,9 @@ function fence(x1,z1,x2,z2, count=24){
     rail.rotation.y=-Math.atan2(z2-z1,x2-x1);
   }
 }
-fence(-48,-48,48,-48,48); fence(-48,-48,-48,48,48); fence(48,-48,48,48,48); fence(-48,48,48,48,48);
+fence(-48,-48,48,-48,48); fence(-48,-48,-48,48,48);
+// East-side fence has a wide vehicle gate aligned with the garage driveway.
+fence(48,-48,48,-10,19); fence(48,10,48,48,19); fence(-48,48,48,48,48);
 
 // Trees
 function tree(x,z,s=1){
@@ -172,6 +174,34 @@ barn(12,67);
 box(scene,25,1.1,75,8,2.2,7,whiteMat);
 const houseRoof=new THREE.Mesh(new THREE.ConeGeometry(7,3,4),roofMat);
 houseRoof.rotation.y=Math.PI/4; houseRoof.scale.set(1,.55,.8); houseRoof.position.set(25,3.1,78); scene.add(houseRoof);
+// Tractor shed / starting garage just outside the east edge of the crop field.
+const garage = new THREE.Group();
+garage.position.set(64,0,0); scene.add(garage);
+const garageWall = mat(0xd8d0bd), garageTrim = mat(0x9d4938), garageRoofMat = mat(0x343b42);
+box(garage,0,.12,0,19,.24,16,mat(0x77766d),false); // concrete floor
+// Rear wall and side walls leave the west-facing entrance completely open.
+box(garage,9,3,0,.45,6,16,garageWall);
+box(garage,0,3,-7.8,18,6,.4,garageWall);
+box(garage,0,3,7.8,18,6,.4,garageWall);
+box(garage,-8.8,3,-6.5,.4,6,3,garageWall);
+box(garage,-8.8,3,6.5,.4,6,3,garageWall);
+// Dark pitched roof, red fascia and overhead lights.
+const garageRoof = new THREE.Mesh(new THREE.BoxGeometry(20,.55,17),garageRoofMat);
+garageRoof.position.set(0,6.2,0); garageRoof.castShadow=true; garage.add(garageRoof);
+box(garage,0,5.88,-8.25,20,.35,.35,garageTrim);
+box(garage,0,5.88,8.25,20,.35,.35,garageTrim);
+for(const z of [-5,5]){
+  const lamp = new THREE.PointLight(0xffe2a8,1.2,13);
+  lamp.position.set(-2,5.3,z); garage.add(lamp);
+  const shade = new THREE.Mesh(new THREE.BoxGeometry(1,.18,.7),whiteMat);
+  shade.position.set(-2,5.7,z); garage.add(shade);
+}
+// Driveway joins the open garage entrance to a gap in the field fence.
+const driveway = new THREE.Mesh(new THREE.PlaneGeometry(12,12),mat(0x9a8b72));
+driveway.rotation.x=-Math.PI/2; driveway.position.set(50.5,.025,0); scene.add(driveway);
+const apron = new THREE.Mesh(new THREE.PlaneGeometry(8,12),mat(0xaaa08a));
+apron.rotation.x=-Math.PI/2; apron.position.set(56,.035,0); scene.add(apron);
+
 // Distant layered mountain silhouettes and a farm windmill.
 for(let i=0;i<18;i++){
   const x=-130+i*15, z=112+(i%3)*5, h=18+(i%5)*8;
@@ -289,7 +319,9 @@ addEventListener('keydown',e=>{
   if(e.key.toLowerCase()==='c'){thirdPerson=!thirdPerson;orbitYaw=0;orbitPitch=.32;orbitDistance=13;}
 });
 
-tractor.position.set(0,0,0);
+// Start parked inside the garage, lined up to drive west through the gate into the field.
+tractor.position.set(64,0,0);
+tractor.rotation.y = -Math.PI/2;
 const clock=new THREE.Clock();
 let gameStarted=false;
 document.getElementById('play').onclick=()=>{document.getElementById('start').style.display='none';gameStarted=true;};
