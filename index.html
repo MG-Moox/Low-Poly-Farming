@@ -509,7 +509,6 @@ function update(dt){
   camera.lookAt(targetVec);
   document.getElementById('speed').textContent=Math.round(Math.abs(speed)*3.6);
   document.getElementById('money').textContent=money.toLocaleString();
-  if(document.getElementById('dealerShop').style.display==='block')renderDealer();
   const pct=Math.round(cutGrass/totalGrass*100);
   document.getElementById('mown').textContent=pct+'%';
   document.getElementById('progress').style.width=pct+'%';
