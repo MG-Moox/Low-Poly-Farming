@@ -119,11 +119,11 @@ for(let layer=0;layer<3;layer++){
   }
 }
 const skyTex=new THREE.CanvasTexture(skyCanvas);skyTex.colorSpace=THREE.SRGBColorSpace;
-skyTex.mapping=THREE.EquirectangularReflectionMapping;
+skyTex.mapping=THREE.UVMapping;
 const skyDome=new THREE.Mesh(new THREE.SphereGeometry(380,48,32),new THREE.MeshBasicMaterial({map:skyTex,side:THREE.BackSide,depthWrite:false,fog:false}));
 scene.add(skyDome);scene.background=null;
 // Large, soft 3D cloud formations add depth against the skybox.
-const cloudMat=new THREE.MeshStandardMaterial({color:0xffffff,roughness:1,transparent:true,opacity:.92,flatShading:false});
+const cloudMat=new THREE.MeshStandardMaterial({color:0xffffff,emissive:0x9eb8ca,emissiveIntensity:.38,roughness:1,flatShading:false});
 for(let i=0;i<32;i++){
  const cloud=new THREE.Group();cloud.position.set(-190+Math.random()*380,48+Math.random()*35,-190+Math.random()*380);cloud.scale.set(1.5+Math.random()*2.4, .75+Math.random()*.55,1.5+Math.random()*2.4);scene.add(cloud);
  const puffs=7+Math.floor(Math.random()*6);
@@ -215,8 +215,8 @@ box(dealer,0,.28,-1,25,.12,17,mat(0xb7b9b2),false); // polished showroom floor
 box(dealer,0,3,-9.3,25,6,.45,dealerWall);
 box(dealer,-12.3,3,-.2,.45,6,18,dealerWall);
 box(dealer,12.3,3,-.2,.45,6,18,dealerWall);
-box(dealer,-8.5,3,8.65,7.5,6,.35,dealerWall);
-box(dealer,8.5,3,8.65,7.5,6,.35,dealerWall);
+box(dealer,-10.25,3,8.65,4.5,6,.35,dealerWall);
+box(dealer,10.25,3,8.65,4.5,6,.35,dealerWall);
 // Tall front showroom glazing and dark aluminium mullions.
 for(const x of [-4.5,4.5]){
   const pane=new THREE.Mesh(new THREE.PlaneGeometry(7.1,4.8),glassMat);pane.position.set(x,3.05,8.43);dealer.add(pane);
