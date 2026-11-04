@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>LOW POLY FARMING — COUNTRY LIFE</title>
+<title>FARMING SIMULATOR</title>
 <style>
   *{box-sizing:border-box} body{margin:0;overflow:hidden;background:#8bb8d4;font-family:Inter,system-ui,Arial,sans-serif} canvas{display:block}
   #hud{position:fixed;inset:0;pointer-events:none;color:#fff;text-shadow:0 2px 5px #25180d;font-weight:700}
@@ -88,17 +88,15 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xf5a16b);
 scene.fog = null; // Keep distant fields and hills crisp; no orange distance fog.
 
-const camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.1, 520);
+const camera = new THREE.PerspectiveCamera(65, innerWidth / innerHeight, 0.1, 400);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(innerWidth, innerHeight);
-renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
-renderer.shadowMap.autoUpdate = true;
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.0;
-renderer.useLegacyLights = false;
+renderer.toneMappingExposure = 1.08;
 document.body.appendChild(renderer.domElement);
 
 // Clear outdoor skybox with painted cloud formations and separate 3D cloud banks.
@@ -131,7 +129,7 @@ for(let i=0;i<32;i++){
  const puffs=7+Math.floor(Math.random()*6);
  for(let j=0;j<puffs;j++){
   const radius=2.8+Math.random()*3.8;
-  const puff=new THREE.Mesh(new THREE.SphereGeometry(radius,20,14),cloudMat);
+  const puff=new THREE.Mesh(new THREE.SphereGeometry(radius,12,9),cloudMat);
   puff.position.set((Math.random()-.5)*15,Math.random()*2.2,(Math.random()-.5)*8);
   puff.scale.y=.42+Math.random()*.28;puff.castShadow=false;puff.receiveShadow=false;cloud.add(puff);
  }
@@ -143,10 +141,9 @@ scene.add(new THREE.HemisphereLight(0xd9edff, 0x61754b, 1.75));
 const sun = new THREE.DirectionalLight(0xfff1d5, 3.0);
 sun.position.set(-45, 85, 35);
 sun.castShadow = true;
-sun.shadow.mapSize.set(3072, 3072);
-sun.shadow.camera.left=-125;sun.shadow.camera.right=125;
-sun.shadow.camera.top=125;sun.shadow.camera.bottom=-125;
-sun.shadow.camera.near=1;sun.shadow.camera.far=260;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -90; sun.shadow.camera.right = 90;
+sun.shadow.camera.top = 90; sun.shadow.camera.bottom = -90;
 scene.add(sun);
 sun.castShadow=true;sun.shadow.bias=-0.00015;sun.shadow.normalBias=.025;sun.shadow.radius=4;
 const sunBall = new THREE.Mesh(new THREE.SphereGeometry(7,32,24), new THREE.MeshBasicMaterial({color:0xfff2c2}));
@@ -164,15 +161,12 @@ function makeSurfaceTexture(base, speckle, count=9000){
 }
 const mat = (color, roughness=1) => new THREE.MeshStandardMaterial({ color, roughness, flatShading: false });
 const grassMat = mat(0x79b957), darkGrass = mat(0x589346), dirtMat = mat(0x9b7950);
-grassMat.map=makeSurfaceTexture('#789b50','#c2d18a',15000);
-darkGrass.map=makeSurfaceTexture('#4d8445','#9cbd69',11000);
-dirtMat.map=makeSurfaceTexture('#987953','#d0b184',12000);
-for(const surface of [grassMat,darkGrass,dirtMat]){surface.bumpMap=surface.map;surface.bumpScale=surface===dirtMat?.12:.075;surface.roughness=.96;}
-grassMat.color.setHex(0xffffff);darkGrass.color.setHex(0xffffff);dirtMat.color.setHex(0xffffff);
+grassMat.map=makeSurfaceTexture('#789b50','#c2d18a',11000);
+darkGrass.map=makeSurfaceTexture('#4d8445','#9cbd69',7000);
+dirtMat.map=makeSurfaceTexture('#987953','#d0b184',8500);
 const wheatMat = new THREE.MeshStandardMaterial({color:0xe6b83f,roughness:.88,flatShading:false});
 const wheatTipMat = mat(0xf4d36b), cutWheatMat = mat(0x9b8647);
 const roadMat = mat(0xb4a080), woodMat = mat(0x805538), roofMat = mat(0x984d39);
-roadMat.map=makeSurfaceTexture('#9b8a70','#d4c3a2',6500);roadMat.bumpMap=roadMat.map;roadMat.bumpScale=.1;
 const whiteMat = mat(0xf2ead6), blackMat = mat(0x242a27), yellowMat = mat(0xe4b83f);
 const blueMat = mat(0x397fbd), glassMat = new THREE.MeshPhysicalMaterial({color:0x9bd5df,roughness:.08,metalness:.05,transparent:true,opacity:.3,transmission:.75,thickness:.12,depthWrite:false,side:THREE.DoubleSide});
 
@@ -196,7 +190,7 @@ for(let i=0;i<18;i++){
 }
 // One enormous rectangular crop field. The crop itself fills almost all of it.
 const FIELD_W = 92, FIELD_D = 92;
-const fieldSoilMat=mat(0x8c7845);fieldSoilMat.map=makeSurfaceTexture('#88734a','#c2a36c',15000);fieldSoilMat.bumpMap=fieldSoilMat.map;fieldSoilMat.bumpScale=.16;
+const fieldSoilMat=mat(0x8c7845);fieldSoilMat.map=makeSurfaceTexture('#88734a','#c2a36c',10000);
 const fieldSoil = new THREE.Mesh(new THREE.PlaneGeometry(FIELD_W, FIELD_D), fieldSoilMat);
 fieldSoil.rotation.x = -Math.PI/2; fieldSoil.position.set(0, -.04, 0); scene.add(fieldSoil);
 const fieldEdge = new THREE.Mesh(new THREE.PlaneGeometry(FIELD_W+5, FIELD_D+5), mat(0x65984a));
@@ -249,16 +243,11 @@ for(const x of [-8,0,8]){const light=new THREE.PointLight(0xffedcf,2.1,22);light
 for(const x of [-14,-10,10,14]){const post=new THREE.Mesh(new THREE.CylinderGeometry(.16,.2,.85,12),yellowMat);post.position.set(x,.43,11.5);dealer.add(post);}
 // Trees
 function tree(x,z,s=1){
-  const g=new THREE.Group();g.position.set(x,0,z);g.scale.setScalar(s);scene.add(g);
-  const bark=mat(0x60432f),leafA=mat(0x356b3e),leafB=mat(0x477f43),leafC=mat(0x608d49);
-  cylinder(g,0,1.45,0,.22,.34,2.9,bark,10);
-  for(const side of [-1,1]){const limb=cylinder(g,side*.34,2.55,0,.10,.16,1.25,bark,8);limb.rotation.z=side*.55;}
-  const crown=new THREE.Mesh(new THREE.IcosahedronGeometry(1.55,4),leafA);
-  crown.position.y=3.55;crown.scale.set(1.08,1.12,.98);crown.castShadow=true;g.add(crown);
-  for(const [cx,cy,cz,r,m] of [[.82,3.45,.08,.88,leafB],[-.78,3.62,.2,.82,leafC],[.12,4.25,-.48,.86,leafB],[.05,3.2,.72,.72,leafC]]){
-    const puff=new THREE.Mesh(new THREE.IcosahedronGeometry(r,3),m);
-    puff.position.set(cx,cy,cz);puff.scale.set(1,.92,1.08);puff.castShadow=true;puff.receiveShadow=true;g.add(puff);
-  }
+  const g=new THREE.Group(); g.position.set(x,0,z); g.scale.setScalar(s); scene.add(g);
+  cylinder(g,0,1.1,0,.28,.4,2.2,woodMat,6);
+  const crown=new THREE.Mesh(new THREE.SphereGeometry(1.45,20,16),mat(0x347d48));
+  crown.position.y=3.1;crown.scale.set(1,1.18,1);crown.castShadow=true;g.add(crown);
+  for(const [cx,cy,cz,s] of [[.75,3.55,.1,.82],[-.7,3.45,.25,.78],[.1,4.05,-.25,.72]]){const puff=new THREE.Mesh(new THREE.SphereGeometry(s,18,14),mat(0x5b9d50));puff.position.set(cx,cy,cz);puff.castShadow=true;g.add(puff);}
 }
 for(let i=0;i<55;i++){
   const x=(Math.random()-.5)*210, z=(Math.random()-.5)*210;
@@ -365,18 +354,7 @@ function makeVehicle(type){
     box(root,0,1.65,1.45,1.75,.55,.75,redPaint);
     box(root,-.98,1.05,-.95,.35,.85,.3,redPaint);
     box(root,.98,1.05,-.95,.35,.85,.3,redPaint);
-    cylinder(root,0,2.9,.85,.11,.11,.65,blackMat,12);
-    for(const side of [-1,1]){
-      const mirrorArm=cylinder(root,side*.94,2.72,-.75,.035,.035,.58,blackMat,8);mirrorArm.rotation.z=side*.18;
-      box(root,side*1.02,3.02,-.78,.28,.2,.12,blackMat);
-      box(root,side*.82,1.72,-.22,.18,.08,.7,metalRimMat);
-      box(root,side*.9,1.02,1.2,.18,.12,.65,blackMat);
-      const rearLamp=new THREE.Mesh(new THREE.BoxGeometry(.18,.22,.12),new THREE.MeshStandardMaterial({color:0xff3929,emissive:0x68100a,emissiveIntensity:.3}));
-      rearLamp.position.set(side*.83,1.68,1.82);root.add(rearLamp);
-    }
-    cylinder(root,-.55,2.2,-1.28,.075,.075,.9,blackMat,12);
-    box(root,0,1.02,-1.74,1.6,.16,.12,metalRimMat);
-    for(let i=0;i<5;i++)box(root,-.48+i*.24,1.12,-1.61,.035,.34,.035,metalRimMat);
+    cylinder(root,0,2.9,.85,.11,.11,.65,blackMat,8);
   } else {
     box(root,0,1.55,-.15,1.05,.65,1.05,yellowMat);
     box(root,0,1.95,-.65,.9,.12,.7,blackMat);
@@ -392,13 +370,10 @@ function makeVehicle(type){
       const z=front?-wheelZ:wheelZ;
       const x=side*(isTractor?(front?.86:1.12):.78);
       const r=isTractor?(front?.58:.88):.48;
-      const w=new THREE.Mesh(new THREE.CylinderGeometry(r,r,wheelW,24),new THREE.MeshStandardMaterial({color:0x171a19,roughness:.98}));
-      w.rotation.z=Math.PI/2;w.position.set(x,r+.28,z);w.castShadow=true;w.receiveShadow=true;root.add(w);wheels.push(w);
-      const hub=new THREE.Mesh(new THREE.CylinderGeometry(r*.38,r*.38,wheelW+.035,20),yellowMat);
-      hub.rotation.z=Math.PI/2;hub.position.copy(w.position);root.add(hub);
-      const lugMat=new THREE.MeshStandardMaterial({color:0x202321,roughness:1});
-      for(let tread=0;tread<18;tread++){const a=tread/18*Math.PI*2;const lug=new THREE.Mesh(new THREE.BoxGeometry(wheelW*.82,.105,.17),lugMat);lug.position.set(x,w.position.y+Math.cos(a)*r*.96,z+Math.sin(a)*r*.96);lug.rotation.x=a;lug.castShadow=true;root.add(lug);}
-      const rim=new THREE.Mesh(new THREE.TorusGeometry(r*.43,.055,8,24),metalRimMat);rim.rotation.y=Math.PI/2;rim.position.copy(w.position);root.add(rim);
+      const w=new THREE.Mesh(new THREE.CylinderGeometry(r,r,wheelW,10),blackMat);
+      w.rotation.z=Math.PI/2; w.position.set(x,r+.28,z); w.castShadow=true; root.add(w); wheels.push(w);
+      const hub=new THREE.Mesh(new THREE.CylinderGeometry(r*.38,r*.38,wheelW+.02,8),yellowMat);
+      hub.rotation.z=Math.PI/2; hub.position.copy(w.position); root.add(hub);
     }
   }
   // steering wheel
@@ -409,7 +384,6 @@ function makeVehicle(type){
   return root;
 }
 const greenPaint=mat(0x4f9b42);
-const metalRimMat=new THREE.MeshStandardMaterial({color:0xb8bfc0,metalness:.72,roughness:.34});
 const redPaint=new THREE.MeshStandardMaterial({color:0xd9362e,roughness:.28,metalness:.22,envMapIntensity:1.5});
 
 // Parked display machinery inside the dealership showroom.
@@ -552,7 +526,6 @@ class VehicleSystem{
  detachImplement(){if(!this.attached)return;const p=new THREE.Vector3();this.attached.getWorldPosition(p);this.attached.parent.remove(this.attached);this.scene.add(this.attached);this.attached.position.copy(p);this.attached.userData.isAttached=false;this.attached.userData.isLowered=false;this.attached=null;}
  toggleImplementHeight(){const t=this.attached;if(!t)return;t.userData.isLowered=!t.userData.isLowered;t.userData.targetY=t.userData.isLowered?-.5:0;say(t.userData.isLowered?"Implement lowered":"Implement raised");}
  updateWork(dt){
-  for(const cell of fieldCells)if(cell.state==="seeded"&&performance.now()>=cell.growAt)setCellState(cell,"growing");
   const tool=this.attached;if(!tool)return;tool.position.y=THREE.MathUtils.damp(tool.position.y,tool.userData.targetY,8,dt);
   if(!tool.userData.isLowered||Math.abs(tool.position.y-tool.userData.targetY)>.06)return;
   const type=tool.userData.type,q=new THREE.Quaternion();tool.getWorldQuaternion(q);
@@ -562,6 +535,7 @@ class VehicleSystem{
    else if(type==="seeder"&&cell.state==="plowed"){setCellState(cell,"seeded");cell.growAt=performance.now()+10000;}
    else if(type==="harvester"&&cell.state==="growing"){setCellState(cell,"harvested");this.grain+=250;}
   }
+  for(const cell of fieldCells)if(cell.state==="seeded"&&performance.now()>=cell.growAt)setCellState(cell,"growing");
   document.getElementById("grainAmount").textContent=this.grain.toLocaleString();
  }
 }
