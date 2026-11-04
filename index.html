@@ -5,30 +5,39 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>LOW POLY FARMING</title>
 <style>
-  :root { color-scheme: dark; }
-  * { box-sizing: border-box; }
-  body { margin: 0; overflow: hidden; background: #9bc8e8; font-family: Inter, system-ui, Arial, sans-serif; }
-  canvas { display: block; }
-  #hud { position: fixed; inset: 0; pointer-events: none; color: white; text-shadow: 0 2px 5px #183323; }
-  .panel { background: #14251dcc; border: 1px solid #ffffff30; border-radius: 14px; padding: 12px 16px; backdrop-filter: blur(8px); }
-  #brand { position: absolute; top: 18px; left: 18px; font-weight: 900; letter-spacing: 2px; font-size: 20px; }
-  #stats { position: absolute; top: 18px; right: 18px; text-align: right; min-width: 150px; }
-  #help { position: absolute; left: 18px; bottom: 18px; max-width: 330px; line-height: 1.6; font-size: 12px; }
-  #status { position: absolute; bottom: 22px; right: 20px; text-align: right; font-size: 13px; }
-  #crosshair { position: absolute; left: 50%; top: 50%; width: 5px; height: 5px; border-radius: 50%; background: #fff9; transform: translate(-50%,-50%); }
-  #message { position: absolute; top: 82px; left: 50%; transform: translateX(-50%); font-weight: 800; font-size: 14px; }
-  #start { position: fixed; inset: 0; z-index: 5; display: grid; place-items: center; background: linear-gradient(#14251d88,#14251dcc), radial-gradient(ellipse at center,#8fbd78,#294d36); color: white; }
-  #start .card { width: min(92vw, 520px); padding: 34px; text-align: center; background: #14251de8; border: 1px solid #ffffff35; border-radius: 22px; box-shadow: 0 25px 80px #0007; }
-  #start h1 { margin: 0 0 8px; font-size: clamp(34px,8vw,58px); line-height: .95; letter-spacing: -2px; }
-  #start p { color: #d3e4d1; line-height: 1.5; }
-  button { pointer-events: auto; border: 0; border-radius: 12px; padding: 13px 22px; font-weight: 800; font-size: 15px; color: #17311e; background: #c8ef83; cursor: pointer; }
-  button:hover { background: #dcff9d; transform: translateY(-1px); }
-  .small { color: #c7d9c7; font-size: 12px; }
-  @media (max-width: 650px) {
-    #brand { font-size: 15px; }
-    #help { max-width: 220px; font-size: 10px; }
-    #stats { font-size: 12px; }
-  }
+  *{box-sizing:border-box} body{margin:0;overflow:hidden;background:#f5a04d;font-family:Inter,system-ui,Arial,sans-serif} canvas{display:block}
+  #hud{position:fixed;inset:0;pointer-events:none;color:#fff;text-shadow:0 2px 5px #25180d;font-weight:700}
+  .glass{background:rgba(18,22,28,.82);border:1px solid #ffffff35;border-radius:15px;box-shadow:0 8px 24px #1b130b55;backdrop-filter:blur(8px)}
+  #cash{position:absolute;top:16px;left:18px;padding:8px 18px;font-size:clamp(21px,3vw,34px);letter-spacing:.4px}
+  #cash b{color:#25f044;font-size:1.25em;margin-right:10px}
+  #mission{position:absolute;top:82px;left:18px;width:300px;padding:13px 15px;font-size:15px}
+  #mission strong{font-size:18px;display:block;margin-bottom:6px}
+  #mission .bar{height:13px;background:#555b62;border-radius:20px;margin-top:10px;overflow:hidden}
+  #progress{height:100%;width:0;background:#20ec42;border-radius:20px;transition:width .2s}
+  #clock{position:absolute;top:16px;right:18px;padding:11px 17px;font-size:20px}
+  #clock span{margin:0 10px;color:#ffc84b}
+  #minimap{position:absolute;left:20px;bottom:20px;width:250px;height:220px;border:4px solid #101b18;border-radius:18px;background:linear-gradient(135deg,#4c9c37,#246d35 45%,#8caa39);overflow:hidden;box-shadow:0 8px 25px #0008}
+  #minimap:before{content:"";position:absolute;width:150%;height:18px;background:#3d9fca;transform:rotate(-35deg);left:-30px;top:55px;border:3px solid #c4b879}
+  #mapfield{position:absolute;width:135px;height:145px;left:58px;top:37px;background:#e6b632;border:3px solid #a88a30;transform:rotate(28deg);box-shadow:inset 0 0 0 3px #f6d76b}
+  #mapplayer{position:absolute;left:112px;top:103px;color:#111;font-size:35px;text-shadow:0 1px white}
+  #north{position:absolute;top:-13px;left:104px;background:#111;border-radius:50%;padding:3px 8px;font-size:18px}
+  #controls{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);padding:11px 20px;white-space:nowrap;font-size:14px}
+  .key{display:inline-block;background:#f8f8f8;color:#202020;border-radius:5px;padding:4px 8px;margin:0 4px;font-weight:900;text-shadow:none}
+  #gauge{position:absolute;right:22px;bottom:22px;width:218px;height:218px;border-radius:50%;background:conic-gradient(from 225deg,#16d64b 0deg,#9cdb39 125deg,#f6bc28 155deg,#ed3e28 225deg,#222 226deg);padding:9px;box-shadow:0 8px 28px #0008}
+  #gaugeinner{height:100%;border-radius:50%;background:rgba(20,19,17,.9);display:flex;flex-direction:column;align-items:center;justify-content:center;border:4px solid #ffffff55}
+  #speed{font-size:55px;line-height:1}
+  #speedunit{font-size:15px;margin-top:4px}
+  #rpm{position:absolute;right:0;bottom:-15px;width:100%;text-align:center;padding:9px;border-radius:13px;font-size:17px}
+  #fuel{position:absolute;right:260px;bottom:30px;width:46px;height:145px;padding:6px;border-radius:12px;display:flex;align-items:end}
+  #fuelbar{height:75%;width:100%;background:#16e447;border-radius:5px}
+  #message{position:absolute;top:45%;left:50%;transform:translate(-50%,-50%);font-size:20px}
+  #start{position:fixed;inset:0;z-index:5;display:grid;place-items:center;background:linear-gradient(#191b2a77,#191b2acc),radial-gradient(ellipse at center,#ffbd67,#442d37);color:white}
+  #start .card{width:min(92vw,520px);padding:34px;text-align:center;background:#171b25ed;border:1px solid #ffffff45;border-radius:22px;box-shadow:0 25px 80px #0009}
+  #start h1{margin:0 0 8px;font-size:clamp(34px,8vw,58px);line-height:.95;letter-spacing:-2px}
+  #start p{color:#e8dfd5;line-height:1.5}
+  button{pointer-events:auto;border:0;border-radius:12px;padding:13px 22px;font-weight:900;font-size:15px;color:#17311e;background:#d4f17e;cursor:pointer}
+  .small{font-size:12px;color:#c7d9c7}
+  @media(max-width:700px){#mission{width:230px;font-size:12px}#clock{font-size:13px}#minimap{width:150px;height:140px}#mapfield{transform:scale(.65) rotate(28deg);left:15px;top:12px}#mapplayer{left:62px;top:62px}#gauge{width:145px;height:145px;right:8px;bottom:12px}#speed{font-size:38px}#fuel{right:158px;height:95px;width:30px}#controls{font-size:10px;bottom:8px}}
 </style>
 </head>
 <body>
@@ -41,30 +50,22 @@
   </div>
 </div>
 <div id="hud">
-  <div id="brand" class="panel">LOW POLY FARMING</div>
-  <div id="stats" class="panel">
-    <div id="vehicle">VEHICLE: RED FARM TRACTOR</div>
-    <div id="speed">SPEED: 0 km/h</div>
-    <div id="money">MONEY: $250</div>
-  </div>
+  <div id="cash" class="glass"><b>$</b><span id="money">250</span></div>
+  <div id="mission" class="glass"><strong>⚠ Harvest the Field</strong><span>• Cut 90% of the field</span><div class="bar"><div id="progress"></div></div><span id="mown">0%</span></div>
+  <div id="clock" class="glass">☀ <span>16:20</span> | ▦ Day 1</div>
+  <div id="minimap" class="glass"><div id="north">N</div><div id="mapfield"></div><div id="mapplayer">▲</div></div>
+  <div id="controls" class="glass"><span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span> Drive &nbsp; <span class="key">F</span> Raise / Lower &nbsp; <span class="key">C</span> Camera</div>
+  <div id="fuel" class="glass"><div id="fuelbar"></div></div>
+  <div id="gauge"><div id="gaugeinner"><div id="speed">0</div><div id="speedunit">KPH</div><div id="rpm" class="glass">RPM 900</div></div></div>
   <div id="message"></div>
-  <div id="crosshair"></div>
-  <div id="help" class="panel">
-    <b>CONTROLS</b><br>
-    W / S — Accelerate / reverse<br>
-    A / D — Steer · SPACE — Brake<br>
-    F — Lower / raise harvester<br>
-    C — Change camera
-  </div>
-  <div id="status" class="panel">HARVESTER: <b id="blades">UP</b><br>CROP HARVESTED: <b id="mown">0%</b></div>
 </div>
 
 <script type="module">
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x9bc8e8);
-scene.fog = new THREE.Fog(0x9bc8e8, 65, 190);
+scene.background = new THREE.Color(0xf5a16b);
+scene.fog = new THREE.Fog(0xe99a72, 115, 290);
 
 const camera = new THREE.PerspectiveCamera(65, innerWidth / innerHeight, 0.1, 400);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -73,16 +74,21 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.18;
 document.body.appendChild(renderer.domElement);
 
-scene.add(new THREE.HemisphereLight(0xdff3ff, 0x617b45, 2.0));
-const sun = new THREE.DirectionalLight(0xfff2d5, 2.2);
-sun.position.set(-45, 70, 35);
+scene.add(new THREE.HemisphereLight(0xffd6b0, 0x4c5837, 1.35));
+const sun = new THREE.DirectionalLight(0xffb36b, 3.2);
+sun.position.set(-45, 55, 55);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
 sun.shadow.camera.left = -90; sun.shadow.camera.right = 90;
 sun.shadow.camera.top = 90; sun.shadow.camera.bottom = -90;
 scene.add(sun);
+const sunBall = new THREE.Mesh(new THREE.SphereGeometry(7,32,24), new THREE.MeshBasicMaterial({color:0xffd36a}));
+sunBall.position.set(-42,34,105); scene.add(sunBall);
+const sunGlow = new THREE.PointLight(0xff9a4d, 2.2, 180); sunGlow.position.copy(sunBall.position); scene.add(sunGlow);
 
 const mat = (color, roughness=1) => new THREE.MeshStandardMaterial({ color, roughness, flatShading: true });
 const grassMat = mat(0x79b957), darkGrass = mat(0x589346), dirtMat = mat(0x9b7950);
@@ -162,10 +168,23 @@ function barn(x,z){
   box(g,-2.7,2.4,4.1,1.3,1.3,.12,whiteMat);
   box(g,2.7,2.4,4.1,1.3,1.3,.12,whiteMat);
 }
-barn(19,-24);
-box(scene,19,1.1,-10,8,2.2,7,whiteMat);
+barn(12,67);
+box(scene,25,1.1,75,8,2.2,7,whiteMat);
 const houseRoof=new THREE.Mesh(new THREE.ConeGeometry(7,3,4),roofMat);
-houseRoof.rotation.y=Math.PI/4; houseRoof.scale.set(1,.55,.8); houseRoof.position.set(19,3.1,-10); scene.add(houseRoof);
+houseRoof.rotation.y=Math.PI/4; houseRoof.scale.set(1,.55,.8); houseRoof.position.set(25,3.1,78); scene.add(houseRoof);
+// Distant layered mountain silhouettes and a farm windmill.
+for(let i=0;i<18;i++){
+  const x=-130+i*15, z=112+(i%3)*5, h=18+(i%5)*8;
+  const peak=new THREE.Mesh(new THREE.ConeGeometry(13,h,7),mat(i%3===0?0x6c7182:0x586a61));
+  peak.position.set(x,h*.38,z); peak.rotation.y=.25; peak.castShadow=true; scene.add(peak);
+  if(i%3===0){const snow=new THREE.Mesh(new THREE.ConeGeometry(5,h*.25,7),mat(0xe7e7df));snow.position.set(x,h*.78,z);scene.add(snow);}
+}
+const mill=new THREE.Group(); mill.position.set(-10,0,70); scene.add(mill);
+cylinder(mill,0,5,0,.38,.55,10,mat(0x76503a),8);
+const millHub=new THREE.Group(); millHub.position.set(0,9,0); mill.add(millHub);
+cylinder(millHub,0,0,0,.35,.35,.8,blackMat,10,Math.PI/2);
+for(let i=0;i<4;i++){const sail=box(millHub,0,2.1,0,.28,4.1,.12,whiteMat);sail.rotation.z=i*Math.PI/2;}
+
 
 // Tractor and ride-on mower models
 function makeVehicle(type){
@@ -267,15 +286,21 @@ addEventListener('keydown',e=>{
     blades=!blades; bladeGroup.visible=blades;
     say(blades?'Rear harvester lowered':'Rear harvester raised');
   }
-  if(e.key.toLowerCase()==='c')thirdPerson=!thirdPerson;
+  if(e.key.toLowerCase()==='c'){thirdPerson=!thirdPerson;orbitYaw=0;orbitPitch=.32;orbitDistance=13;}
 });
 
 tractor.position.set(0,0,0);
 const clock=new THREE.Clock();
 let gameStarted=false;
 document.getElementById('play').onclick=()=>{document.getElementById('start').style.display='none';gameStarted=true;};
-const cameraOffset=new THREE.Vector3(0,5,9);
 const targetVec=new THREE.Vector3();
+let orbitYaw=0, orbitPitch=0.32, orbitDistance=13, dragging=false, lastPointerX=0, lastPointerY=0;
+renderer.domElement.style.cursor='grab';
+renderer.domElement.addEventListener('pointerdown',e=>{dragging=true;lastPointerX=e.clientX;lastPointerY=e.clientY;renderer.domElement.setPointerCapture(e.pointerId);renderer.domElement.style.cursor='grabbing';});
+renderer.domElement.addEventListener('pointermove',e=>{if(!dragging)return;orbitYaw-=(e.clientX-lastPointerX)*.006;orbitPitch=THREE.MathUtils.clamp(orbitPitch+(e.clientY-lastPointerY)*.004,-.15,1.05);lastPointerX=e.clientX;lastPointerY=e.clientY;});
+renderer.domElement.addEventListener('pointerup',()=>{dragging=false;renderer.domElement.style.cursor='grab';});
+renderer.domElement.addEventListener('wheel',e=>{orbitDistance=THREE.MathUtils.clamp(orbitDistance+e.deltaY*.015,6,28);},{passive:true});
+
 function update(dt){
   if(!gameStarted)return;
   const forward=keys.w||keys.arrowup, reverse=keys.s||keys.arrowdown;
@@ -312,21 +337,24 @@ function update(dt){
       }
     }
   }
-  if(thirdPerson){
-    const behind=new THREE.Vector3(-Math.sin(active.rotation.y),0,-Math.cos(active.rotation.y)).multiplyScalar(8);
-    targetVec.copy(active.position).add(new THREE.Vector3(0,3.3,0));
-    const desired=active.position.clone().add(behind).add(new THREE.Vector3(0,4,0));
-    camera.position.lerp(desired,1-Math.pow(.001,dt));
-    camera.lookAt(targetVec);
-  }else{
-    const forwardVec=new THREE.Vector3(Math.sin(active.rotation.y),0,Math.cos(active.rotation.y));
-    camera.position.copy(active.position).add(new THREE.Vector3(0,2.0,0)).addScaledVector(forwardVec,.25);
-    camera.lookAt(active.position.clone().addScaledVector(forwardVec,12).add(new THREE.Vector3(0,1,0)));
-  }
-  document.getElementById('speed').textContent='SPEED: '+Math.round(Math.abs(speed)*3.6)+' km/h';
-  document.getElementById('money').textContent='MONEY: $'+money;
-  document.getElementById('blades').textContent=blades?'DOWN':'UP';
-  document.getElementById('mown').textContent=Math.round(cutGrass/totalGrass*100)+'%';
+  const orbitAngle=active.rotation.y+orbitYaw+Math.PI;
+  const horizontal=Math.cos(orbitPitch)*orbitDistance;
+  const desired=new THREE.Vector3(
+    active.position.x+Math.sin(orbitAngle)*horizontal,
+    active.position.y+2.4+Math.sin(orbitPitch)*orbitDistance,
+    active.position.z+Math.cos(orbitAngle)*horizontal
+  );
+  camera.position.lerp(desired,1-Math.pow(.0005,dt));
+  targetVec.copy(active.position).add(new THREE.Vector3(0,1.6,0));
+  camera.lookAt(targetVec);
+  document.getElementById('speed').textContent=Math.round(Math.abs(speed)*3.6);
+  document.getElementById('money').textContent=money.toLocaleString();
+  const pct=Math.round(cutGrass/totalGrass*100);
+  document.getElementById('mown').textContent=pct+'%';
+  document.getElementById('progress').style.width=pct+'%';
+  document.getElementById('rpm').textContent='RPM '+Math.round(900+Math.abs(speed)*110);
+  document.getElementById('mapplayer').style.transform='rotate('+(-active.rotation.y*180/Math.PI)+'deg)';
+
 }
 function animate(){
   requestAnimationFrame(animate);
