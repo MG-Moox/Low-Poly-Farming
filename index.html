@@ -32,6 +32,11 @@
   #fuelbar{height:75%;width:100%;background:#16e447;border-radius:5px}
   #message{position:absolute;top:45%;left:50%;transform:translate(-50%,-50%);font-size:20px}
   #hud{display:none}
+  #dealerShop{position:fixed;inset:0;z-index:8;display:none;align-items:center;justify-content:center;background:#071017b8;color:#fff}
+  #dealerShop .panel{width:min(92vw,620px);padding:28px;background:linear-gradient(145deg,#17242a,#26373b);border:1px solid #ffffff40;border-top:4px solid #a6df42;border-radius:14px;box-shadow:0 24px 80px #0009}
+  #dealerShop h2{font-size:28px;margin:0 0 8px}#dealerShop p{color:#cbd6d2}
+  .shopitem{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 0;border-top:1px solid #ffffff25}
+  #shopClose{float:right;background:#35464a;color:white;padding:8px 13px}
   #start{position:fixed;inset:0;z-index:5;display:flex;align-items:center;padding:clamp(18px,5vw,72px);background:linear-gradient(90deg,rgba(8,15,17,.88) 0%,rgba(8,15,17,.55) 36%,rgba(8,15,17,.08) 72%),linear-gradient(0deg,rgba(8,12,15,.38),transparent 45%);color:white;overflow:hidden}
   #start:after{content:"CINEMATIC FARM SIMULATOR  •  BUILD YOUR FARM";position:absolute;right:28px;bottom:22px;font-size:11px;letter-spacing:2px;color:#ffffffb8}
   #start .card{position:relative;width:min(92vw,500px);padding:clamp(24px,4vw,42px);text-align:left;background:linear-gradient(145deg,rgba(12,20,22,.88),rgba(16,24,26,.66));border:1px solid #ffffff38;border-left:4px solid #a6df42;border-radius:5px 18px 18px 5px;box-shadow:0 25px 80px #0008;backdrop-filter:blur(10px)}
@@ -58,6 +63,7 @@
     <p class="small">EARLY ACCESS • WORK IN PROGRESS</p>
   </div>
 </div>
+<div id="dealerShop"><div class="panel"><button id="shopClose">CLOSE ✕</button><h2>TRACTOR & IMPLEMENT DEALERSHIP</h2><p>Buy machinery for your farm. Your purchases are added to your equipment.</p><div class="shopitem"><div><b>Compact ride-on mower</b><br><span class="small">A smaller machine for grass and field edges</span><br><b>$8,000</b></div><button id="buyMower">BUY MOWER</button></div><p class="small">Drive close to the dealership and press U to open this shop.</p></div></div>
 <div id="hud">
   <div id="cash" class="glass"><b>$</b><span id="money">250</span></div>
   <div id="mission" class="glass"><strong>⚠ Harvest the Field</strong><span>• Cut 90% of the field</span><div class="bar"><div id="progress"></div></div><span id="mown">0%</span></div>
@@ -331,11 +337,13 @@ const redPaint=new THREE.MeshStandardMaterial({color:0xd9362e,roughness:.28,meta
 
 // Glass material is declared once with the farm materials above.
 const tractor=makeVehicle('tractor'); scene.add(tractor);
+let mower=null, mowerOwned=false;
 let active=tractor, vehicleType='tractor', blades=true, headlights=false, thirdPerson=true;
 let speed=0, steer=0, money=250, totalGrass=0, cutGrass=0;
 const keys={};
 addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;if([' ','arrowup','arrowdown','arrowleft','arrowright'].includes(e.key.toLowerCase()))e.preventDefault();});
 addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+addEventListener('keydown',e=>{if(e.key==='Escape')document.getElementById('dealerShop').style.display='none';});
 // Wide rear-mounted crop harvester, physically attached to the tractor.
 const bladeGroup = new THREE.Group();
 tractor.add(bladeGroup);
@@ -395,6 +403,125 @@ wheatInstances.instanceMatrix.needsUpdate=true;
 totalGrass=grassTufts.length;
 
 function say(t){const el=document.getElementById('message');el.textContent=t;clearTimeout(say.timer);say.timer=setTimeout(()=>el.textContent='',2200);}
+document.getElementById('shopClose').onclick=()=>document.getElementById('dealerShop').style.display='none';
+document.getElementById('buyMower').onclick=()=>{if(mowerOwned){say('You already own this mower');return;}if(money<8000){say('You need 
+addEventListener('keydown',e=>{
+  if(e.repeat)return;
+  const key=e.key.toLowerCase();
+  if(key==='u'){
+    if(Math.hypot(active.position.x-111,active.position.z)<22){document.getElementById('dealerShop').style.display='flex';return;}
+    const field=extraFields.find(f=>Math.hypot(active.position.x-f.x,active.position.z-(f.z+f.size/2+3))<15);
+    if(field){
+      if(field.unlocked)say(field.name+' already unlocked');
+      else if(money>=field.cost){money-=field.cost;field.unlocked=true;say(field.name+' unlocked!');}
+      else say('Need $'+(field.cost-money).toLocaleString()+' more for '+field.name);
+    }
+    else say('Drive to a field gate and press U to unlock it');
+  }
+  if(key==='f'){blades=!blades;bladeGroup.visible=blades;say(blades?'Rear harvester lowered':'Rear harvester raised');}
+  if(key==='c'){orbitYaw=0;orbitPitch=.32;orbitDistance=13;say('Camera reset');}
+});
+// Start parked inside the garage, lined up to drive west through the gate into the field.
+tractor.position.set(64,0,0);
+tractor.rotation.y = -Math.PI/2;
+const clock=new THREE.Clock();
+let gameStarted=false, menuTime=0;
+const menuShots=[
+  {p:new THREE.Vector3(88,18,34),t:new THREE.Vector3(28,2,0)},
+  {p:new THREE.Vector3(18,27,91),t:new THREE.Vector3(16,1,48)},
+  {p:new THREE.Vector3(-48,20,36),t:new THREE.Vector3(0,1,0)}
+];
+camera.position.copy(menuShots[0].p);camera.lookAt(menuShots[0].t);
+document.getElementById('play').onclick=()=>{
+  document.getElementById('start').style.display='none';
+  document.getElementById('hud').style.display='block';
+  gameStarted=true;
+};
+const targetVec=new THREE.Vector3();
+let orbitYaw=0, orbitPitch=0.32, orbitDistance=13, dragging=false, lastPointerX=0, lastPointerY=0;
+renderer.domElement.style.cursor='grab';
+renderer.domElement.addEventListener('pointerdown',e=>{dragging=true;lastPointerX=e.clientX;lastPointerY=e.clientY;renderer.domElement.setPointerCapture(e.pointerId);renderer.domElement.style.cursor='grabbing';});
+renderer.domElement.addEventListener('pointermove',e=>{if(!dragging)return;orbitYaw-=(e.clientX-lastPointerX)*.006;orbitPitch=THREE.MathUtils.clamp(orbitPitch+(e.clientY-lastPointerY)*.004,-.15,1.05);lastPointerX=e.clientX;lastPointerY=e.clientY;});
+renderer.domElement.addEventListener('pointerup',()=>{dragging=false;renderer.domElement.style.cursor='grab';});
+renderer.domElement.addEventListener('wheel',e=>{orbitDistance=THREE.MathUtils.clamp(orbitDistance+e.deltaY*.015,6,28);},{passive:true});
+
+function update(dt){
+  if(!gameStarted){
+    menuTime+=dt;
+    const shotIndex=Math.floor(menuTime/8)%menuShots.length;
+    const nextIndex=(shotIndex+1)%menuShots.length;
+    const blend=(menuTime%8)/8;
+    const smooth=blend*blend*(3-2*blend);
+    camera.position.lerpVectors(menuShots[shotIndex].p,menuShots[nextIndex].p,smooth);
+    const look=new THREE.Vector3().lerpVectors(menuShots[shotIndex].t,menuShots[nextIndex].t,smooth);
+    camera.lookAt(look);
+    return;
+  }
+  const forward=keys.w||keys.arrowup, reverse=keys.s||keys.arrowdown;
+  const braking=keys[' '];
+  const maxSpeed=13;
+  if(forward)speed=Math.min(maxSpeed,speed+dt*7);
+  else if(reverse)speed=Math.max(-maxSpeed*.45,speed-dt*5);
+  else speed*=Math.pow(.90,dt*10);
+  if(braking)speed*=Math.pow(.08,dt*5);
+  const steerInput=(keys.a||keys.arrowleft?1:0)-(keys.d||keys.arrowright?1:0);
+  steer=THREE.MathUtils.damp(steer,steerInput,7,dt);
+  const turnFactor=Math.min(1,Math.abs(speed)/2);
+  active.rotation.y += steer*dt*1.8*turnFactor*(speed>=0?1:-1);
+  const dir=new THREE.Vector3(Math.sin(active.rotation.y),0,Math.cos(active.rotation.y));
+  active.position.addScaledVector(dir,speed*dt);
+  active.position.x=THREE.MathUtils.clamp(active.position.x,-115,115);
+  active.position.z=THREE.MathUtils.clamp(active.position.z,-115,115);
+  active.userData.wheels.forEach(w=>w.rotation.x+=speed*dt*1.5);
+  active.userData.steering.rotation.z=steer*.65;
+  if(blades){
+    // Harvest the wide strip directly behind the tractor's rear attachment.
+    const deckX=active.position.x-Math.sin(active.rotation.y)*2.65;
+    const deckZ=active.position.z-Math.cos(active.rotation.y)*2.65;
+    for(const tuft of grassTufts){
+      if(tuft.cut || (tuft.field && !tuft.field.unlocked))continue;
+      const dx=tuft.x-deckX, dz=tuft.z-deckZ;
+      const localX=dx*Math.cos(active.rotation.y)-dz*Math.sin(active.rotation.y);
+      const localZ=dx*Math.sin(active.rotation.y)+dz*Math.cos(active.rotation.y);
+      if(Math.abs(localX)<2.9 && Math.abs(localZ)<.72){
+        tuft.cut=true;
+        cropDummy.position.set(tuft.x,.055,tuft.z); cropDummy.rotation.set(0,0,0); cropDummy.scale.set(1,.10,1); cropDummy.updateMatrix();
+        tuft.mesh?.setMatrixAt(tuft.index,cropDummy.matrix); wheatInstances.setMatrixAt(tuft.index,cropDummy.matrix); wheatInstances.instanceMatrix.needsUpdate=true;
+        cutGrass++; money += 8;
+      }
+    }
+  }
+  const orbitAngle=active.rotation.y+orbitYaw+Math.PI;
+  const horizontal=Math.cos(orbitPitch)*orbitDistance;
+  const desired=new THREE.Vector3(
+    active.position.x+Math.sin(orbitAngle)*horizontal,
+    active.position.y+2.4+Math.sin(orbitPitch)*orbitDistance,
+    active.position.z+Math.cos(orbitAngle)*horizontal
+  );
+  camera.position.lerp(desired,1-Math.pow(.0005,dt));
+  targetVec.copy(active.position).add(new THREE.Vector3(0,1.6,0));
+  camera.lookAt(targetVec);
+  document.getElementById('speed').textContent=Math.round(Math.abs(speed)*3.6);
+  document.getElementById('money').textContent=money.toLocaleString();
+  const pct=Math.round(cutGrass/totalGrass*100);
+  document.getElementById('mown').textContent=pct+'%';
+  document.getElementById('progress').style.width=pct+'%';
+  document.getElementById('rpm').textContent='RPM '+Math.round(900+Math.abs(speed)*110);
+  document.getElementById('mapplayer').style.transform='rotate('+(-active.rotation.y*180/Math.PI)+'deg)';
+
+}
+function animate(){
+  requestAnimationFrame(animate);
+  const dt=Math.min(clock.getDelta(),.04);
+  update(dt);
+  renderer.render(scene,camera);
+}
+animate();
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+</script>
+</body>
+</html>
++(8000-money).toLocaleString()+' more');return;}money-=8000;mower=makeVehicle('mower');scene.add(mower);mower.position.copy(tractor.position);mower.rotation.copy(tractor.rotation);mowerOwned=true;active=mower;vehicleType='mower';blades=false;bladeGroup.visible=false;document.getElementById('buyMower').textContent='OWNED';document.getElementById('dealerShop').style.display='none';say('Mower purchased! You are now driving it.');};
 addEventListener('keydown',e=>{
   if(e.repeat)return;
   const key=e.key.toLowerCase();
