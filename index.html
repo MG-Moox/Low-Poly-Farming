@@ -69,13 +69,13 @@
     <p class="small">EARLY ACCESS • WORK IN PROGRESS</p>
   </div>
 </div>
-<div id="dealerShop"><div class="panel"><button id="shopClose">CLOSE ✕</button><div class="dealer-kicker">FARM EQUIPMENT • SALES & SERVICE</div><h2>TRACTOR & IMPLEMENT DEALERSHIP</h2><p>Browse the showroom and purchase machinery for your farm.</p><div class="stock"><div><b>Compact ride-on mower</b><small>Small mower for grass, verges and tidy-up jobs</small><b>$8,000</b></div><button id="buyMower">BUY MOWER</button></div><div class="stock"><div><b>Single-axle farm trailer</b><small>Attach it behind your tractor for a proper farm setup</small><b>$4,500</b></div><button id="buyTrailer">BUY TRAILER</button></div><div class="shop-foot">More tractors, trailers and implements will be added as the game develops. Press U near the showroom to return here.</div></div></div>
+<div id="dealerShop"><div class="panel"><button id="shopClose">CLOSE ✕</button><div class="dealer-kicker">FARM EQUIPMENT • SALES & SERVICE</div><h2>TRACTOR & IMPLEMENT DEALERSHIP</h2><p>Browse the showroom and purchase machinery for your farm.</p><div class="stock"><div><b>Compact ride-on mower</b><small>Small mower for grass, verges and tidy-up jobs</small><b>$8,000</b></div><button id="buyMower">BUY MOWER</button></div><div class="stock"><div><b>Single-axle farm trailer</b><small>Attach it behind your tractor for a proper farm setup</small><b>$4,500</b></div><button id="buyTrailer">BUY TRAILER</button></div><div class="stock"><div><b>Field plough</b><small>Cultivates standing or harvested ground</small><b>$150</b></div><button id="buyPlow">BUY PLOW</button></div><div class="stock"><div><b>Precision seeder</b><small>Plants cultivated soil; crops grow after a short delay</small><b>$200</b></div><button id="buySeeder">BUY SEEDER</button></div><div class="stock"><div><b>Combine harvester</b><small>Harvests mature crop into stored grain</small><b>$250</b></div><button id="buyHarvester">BUY HARVESTER</button></div><div class="shop-foot">Buy an implement, move within 2.5m of its hitch point and press E to couple it. Press F to raise or lower it. Implements only work when lowered.</div></div></div>
 <div id="hud">
-  <div id="cash" class="glass"><b>$</b><span id="money">250</span></div>
+  <div id="cash" class="glass"><b>$</b><span id="money">250</span></div><div id="grain" class="glass" style="position:absolute;top:72px;left:18px;padding:8px 14px">GRAIN: <span id="grainAmount">0</span> kg</div>
   <div id="mission" class="glass"><strong>⚠ Harvest the Field</strong><span>• Cut 90% of the field</span><div class="bar"><div id="progress"></div></div><span id="mown">0%</span></div>
   <div id="clock" class="glass">☀ <span>16:20</span> | ▦ Day 1</div>
   <div id="minimap" class="glass"><div id="north">N</div><div id="mapfield"></div><div id="mapplayer">▲</div></div>
-  <div id="controls" class="glass"><span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span> Drive &nbsp; <span class="key">F</span> Raise / Lower &nbsp; <span class="key">C</span> Camera</div>
+  <div id="controls" class="glass"><span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span> Drive &nbsp; <span class="key">E</span> Couple &nbsp; <span class="key">F</span> Raise / Lower &nbsp; <span class="key">C</span> Camera</div>
   <div id="fuel" class="glass"><div id="fuelbar"></div></div>
   <div id="gauge"><div id="gaugeinner"><div id="speed">0</div><div id="speedunit">KPH</div><div id="rpm" class="glass">RPM 900</div></div></div>
   <div id="message"></div>
@@ -377,9 +377,10 @@ function makeVehicle(type){
     }
   }
   // steering wheel
+  const hitchPoint=new THREE.Object3D();hitchPoint.name="HitchPoint";hitchPoint.position.set(0,.82,isTractor?2.05:1.35);root.add(hitchPoint);
   const steering=new THREE.Mesh(new THREE.TorusGeometry(.24,.035,6,12),blackMat);
   steering.position.set(0,isTractor?2.05:1.8,.35); steering.rotation.x=.5; root.add(steering);
-  root.userData={wheels,steering,isTractor};
+  root.userData={wheels,steering,isTractor,hitchPoint};
   return root;
 }
 const greenPaint=mat(0x4f9b42);
@@ -416,7 +417,7 @@ function makeTrailer(){
 const displayTrailer=makeTrailer();displayTrailer.position.set(111,0,-5.3);scene.add(displayTrailer);
 const tractor=makeVehicle('tractor'); scene.add(tractor);
 let mower=null, mowerOwned=false, farmTrailer=null, trailerOwned=false;
-let active=tractor, vehicleType='tractor', blades=true, headlights=false, thirdPerson=true;
+let active=tractor, vehicleType='tractor', blades=false, headlights=false, thirdPerson=true;
 let speed=0, steer=0, money=250, totalGrass=0, cutGrass=0;
 const keys={};
 addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;if([' ','arrowup','arrowdown','arrowleft','arrowright'].includes(e.key.toLowerCase()))e.preventDefault();});
@@ -480,10 +481,289 @@ for(const field of extraFields){
 wheatInstances.instanceMatrix.needsUpdate=true;
 totalGrass=grassTufts.length;
 
+// 12 x 12 field-state grid: growing -> harvested -> plowed -> seeded -> growing.
+const FIELD_GRID=12, FIELD_CELL=FIELD_W/FIELD_GRID, fieldCells=[];
+for(let gx=0;gx<FIELD_GRID;gx++)for(let gz=0;gz<FIELD_GRID;gz++){
+ const cell={x:-FIELD_W/2+(gx+.5)*FIELD_CELL,z:-FIELD_D/2+(gz+.5)*FIELD_CELL,state:"growing",growAt:0,tufts:[]};
+ const overlay=new THREE.Mesh(new THREE.PlaneGeometry(FIELD_CELL-.08,FIELD_CELL-.08),new THREE.MeshBasicMaterial({color:0x795332,transparent:true,opacity:0,depthWrite:false}));
+ overlay.rotation.x=-Math.PI/2;overlay.position.set(cell.x,.012,cell.z);scene.add(overlay);cell.overlay=overlay;fieldCells.push(cell);
+}
+for(const tuft of grassTufts){if(tuft.field)continue;const gx=THREE.MathUtils.clamp(Math.floor((tuft.x+FIELD_W/2)/FIELD_CELL),0,FIELD_GRID-1),gz=THREE.MathUtils.clamp(Math.floor((tuft.z+FIELD_D/2)/FIELD_CELL),0,FIELD_GRID-1);fieldCells[gx*FIELD_GRID+gz].tufts.push(tuft);}
+function setCellCropVisible(cell,visible){
+ for(const tuft of cell.tufts){cropDummy.position.set(tuft.x,visible?.52*tuft.scale:.02,tuft.z);cropDummy.rotation.set(0,Math.random()*Math.PI,0);cropDummy.scale.set(1,visible?tuft.scale:.001,1);cropDummy.updateMatrix();wheatInstances.setMatrixAt(tuft.index,cropDummy.matrix);}
+ wheatInstances.instanceMatrix.needsUpdate=true;
+}
+function setCellState(cell,state){
+ cell.state=state;cell.overlay.material.opacity=state==="plowed"?.72:state==="seeded"?.52:0;
+ cell.overlay.material.color.set(state==="plowed"?0x725035:state==="seeded"?0x453d2b:0x795332);
+ if(state==="plowed"||state==="seeded"||state==="harvested")setCellCropVisible(cell,false);
+ if(state==="growing")setCellCropVisible(cell,true);
+}
+function makeImplement(type){
+ const mesh=new THREE.Group();mesh.name=type+" implement";const steel=mat(0x343b3d),frame=mat(0x9b3028),metal=mat(0x9ca5a4),yellow=mat(0xe3b83e);
+ const connection=new THREE.Object3D();connection.name="ImplementConnection";mesh.add(connection);
+ box(mesh,0,.58,1.25,type==="harvester"?5.5:4.5,.22,1.5,frame);box(mesh,0,.82,.15,.22,.25,1.9,steel);
+ for(const side of [-1,1]){const w=new THREE.Mesh(new THREE.CylinderGeometry(.42,.42,.25,16),blackMat);w.rotation.z=Math.PI/2;w.position.set(side*2,.48,1.3);mesh.add(w);const h=new THREE.Mesh(new THREE.CylinderGeometry(.16,.16,.28,12),metal);h.rotation.z=Math.PI/2;h.position.copy(w.position);mesh.add(h);}
+ if(type==="plow"){for(let i=0;i<5;i++){const tine=new THREE.Mesh(new THREE.ConeGeometry(.34,.9,8),metal);tine.position.set(-1.8+i*.9,.05,2.1);tine.rotation.x=Math.PI;mesh.add(tine);}}
+ else if(type==="seeder"){box(mesh,0,1.18,1.3,3.3,.95,1.2,yellow);for(let i=0;i<9;i++){const tube=box(mesh,-1.8+i*.45,.38,2.05,.055,.65,.055,steel);tube.rotation.x=-.25;}}
+ else{box(mesh,0,.42,2.25,5.8,.34,.35,yellow);for(let i=0;i<17;i++){const tine=box(mesh,-2.8+i*.35,.15,2.48,.045,.3,.06,steel);tine.rotation.x=-.2;}box(mesh,0,.98,1.25,2.3,.7,.8,frame);}
+ mesh.userData={type,isAttached:false,isLowered:false,targetY:0};return mesh;
+}
+class VehicleSystem{
+ constructor(scene){this.scene=scene;this.activeVehicle=null;this.vehicles=[];this.implements=[];this.attached=null;this.grain=0;}
+ setActive(v){this.activeVehicle=v;}
+ addImplement(type){
+  const mesh=makeImplement(type),h=this.activeVehicle?.getObjectByName("HitchPoint"),p=new THREE.Vector3();if(h)h.getWorldPosition(p);else p.copy(this.activeVehicle.position);
+  mesh.position.copy(p).add(new THREE.Vector3(1.6,0,0));mesh.rotation.copy(this.activeVehicle.rotation);this.scene.add(mesh);this.implements.push(mesh);say(type.toUpperCase()+" purchased. Move beside it and press E to couple.");return mesh;
+ }
+ attachImplement(tractor,implement){
+  const hitch=tractor.getObjectByName("HitchPoint");if(!hitch)return console.warn("No hitch point found!");
+  const a=new THREE.Vector3(),b=new THREE.Vector3();hitch.getWorldPosition(a);implement.getWorldPosition(b);
+  if(a.distanceTo(b)>2.5){say("Move within 2.5m of the implement hitch");return false;}
+  if(this.attached)this.detachImplement();this.scene.remove(implement);hitch.add(implement);implement.position.set(0,0,0);implement.rotation.set(0,0,0);
+  implement.userData.isAttached=true;this.attached=implement;say(implement.userData.type.toUpperCase()+" coupled");return true;
+ }
+ detachImplement(){if(!this.attached)return;const p=new THREE.Vector3();this.attached.getWorldPosition(p);this.attached.parent.remove(this.attached);this.scene.add(this.attached);this.attached.position.copy(p);this.attached.userData.isAttached=false;this.attached.userData.isLowered=false;this.attached=null;}
+ toggleImplementHeight(){const t=this.attached;if(!t)return;t.userData.isLowered=!t.userData.isLowered;t.userData.targetY=t.userData.isLowered?-.5:0;say(t.userData.isLowered?"Implement lowered":"Implement raised");}
+ updateWork(dt){
+  const tool=this.attached;if(!tool)return;tool.position.y=THREE.MathUtils.damp(tool.position.y,tool.userData.targetY,8,dt);
+  if(!tool.userData.isLowered||Math.abs(tool.position.y-tool.userData.targetY)>.06)return;
+  const type=tool.userData.type,q=new THREE.Quaternion();tool.getWorldQuaternion(q);
+  const center=tool.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0,0,2).applyQuaternion(q)),inv=q.clone().invert();
+  for(const cell of fieldCells){const local=new THREE.Vector3(cell.x-center.x,0,cell.z-center.z).applyQuaternion(inv);if(Math.abs(local.x)>3.1||Math.abs(local.z)>2)continue;
+   if(type==="plow"&&(cell.state==="growing"||cell.state==="harvested"))setCellState(cell,"plowed");
+   else if(type==="seeder"&&cell.state==="plowed"){setCellState(cell,"seeded");cell.growAt=performance.now()+10000;}
+   else if(type==="harvester"&&cell.state==="growing"){setCellState(cell,"harvested");this.grain+=250;}
+  }
+  for(const cell of fieldCells)if(cell.state==="seeded"&&performance.now()>=cell.growAt)setCellState(cell,"growing");
+  document.getElementById("grainAmount").textContent=this.grain.toLocaleString();
+ }
+}
+const vehicleSystem=new VehicleSystem(scene);vehicleSystem.setActive(tractor);
+
 function say(t){const el=document.getElementById('message');el.textContent=t;clearTimeout(say.timer);say.timer=setTimeout(()=>el.textContent='',2200);}
 document.getElementById('shopClose').onclick=()=>document.getElementById('dealerShop').style.display='none';
 document.getElementById('buyMower').onclick=()=>{if(mowerOwned){say('You already own this mower');return;}if(money<8000){say('You need $'+(8000-money).toLocaleString()+' more');return;}money-=8000;mower=makeVehicle('mower');scene.add(mower);mower.position.copy(tractor.position);mower.rotation.copy(tractor.rotation);mowerOwned=true;active=mower;vehicleType='mower';blades=false;bladeGroup.visible=false;document.getElementById('buyMower').textContent='OWNED';document.getElementById('dealerShop').style.display='none';say('Mower purchased! You are now driving it.');};
-document.getElementById('buyTrailer').onclick=()=>{if(trailerOwned){say('You already own this trailer');return;}if(money<4500){say('You need $'+(4500-money).toLocaleString()+' more');return;}money-=4500;farmTrailer=makeTrailer();farmTrailer.position.set(0,0,3.35);tractor.add(farmTrailer);trailerOwned=true;document.getElementById('buyTrailer').textContent='OWNED';document.getElementById('dealerShop').style.display='none';say('Farm trailer purchased and hitched to your tractor!');};
+document.getElementById('buyTrailer').onclick=()=>{if(trailerOwned){say('You already own this trailer');return;}if(money<4500){say('You need 
+addEventListener('keydown',e=>{
+  if(e.repeat)return;
+  const key=e.key.toLowerCase();
+  if(key==='u'){
+    if(Math.hypot(active.position.x-111,active.position.z)<22){document.getElementById('dealerShop').style.display='flex';return;}
+    const field=extraFields.find(f=>Math.hypot(active.position.x-f.x,active.position.z-(f.z+f.size/2+3))<15);
+    if(field){
+      if(field.unlocked)say(field.name+' already unlocked');
+      else if(money>=field.cost){money-=field.cost;field.unlocked=true;say(field.name+' unlocked!');}
+      else say('Need $'+(field.cost-money).toLocaleString()+' more for '+field.name);
+    } else say('Drive to a field gate and press U to unlock it');
+  }
+  if(key==='e'){if(vehicleSystem.attached){vehicleSystem.detachImplement();say('Implement uncoupled');}else{const nearby=vehicleSystem.implements.filter(i=>!i.userData.isAttached).sort((a,b)=>a.position.distanceTo(active.position)-b.position.distanceTo(active.position))[0];if(nearby)vehicleSystem.attachImplement(active,nearby);else say('No implement nearby. Buy one at the dealership.');}}
+  if(key==='f')vehicleSystem.toggleImplementHeight();
+  if(key==='c'){orbitYaw=0;orbitPitch=.32;orbitDistance=13;say('Camera reset');}
+});
+// Start parked inside the garage, lined up to drive west through the gate into the field.
+tractor.position.set(64,0,0);
+tractor.rotation.y = Math.PI/2;
+const clock=new THREE.Clock();
+let gameStarted=false, menuTime=0;
+const menuShots=[
+  {p:new THREE.Vector3(88,18,34),t:new THREE.Vector3(28,2,0)},
+  {p:new THREE.Vector3(18,27,91),t:new THREE.Vector3(16,1,48)},
+  {p:new THREE.Vector3(-48,20,36),t:new THREE.Vector3(0,1,0)}
+];
+camera.position.copy(menuShots[0].p);camera.lookAt(menuShots[0].t);
+document.getElementById('play').onclick=()=>{
+  document.getElementById('start').style.display='none';
+  document.getElementById('hud').style.display='block';
+  gameStarted=true;
+};
+const targetVec=new THREE.Vector3();
+let orbitYaw=0, orbitPitch=0.32, orbitDistance=13, dragging=false, lastPointerX=0, lastPointerY=0;
+renderer.domElement.style.cursor='grab';
+renderer.domElement.addEventListener('pointerdown',e=>{dragging=true;lastPointerX=e.clientX;lastPointerY=e.clientY;renderer.domElement.setPointerCapture(e.pointerId);renderer.domElement.style.cursor='grabbing';});
+renderer.domElement.addEventListener('pointermove',e=>{if(!dragging)return;orbitYaw-=(e.clientX-lastPointerX)*.006;orbitPitch=THREE.MathUtils.clamp(orbitPitch+(e.clientY-lastPointerY)*.004,-.15,1.05);lastPointerX=e.clientX;lastPointerY=e.clientY;});
+renderer.domElement.addEventListener('pointerup',()=>{dragging=false;renderer.domElement.style.cursor='grab';});
+renderer.domElement.addEventListener('wheel',e=>{orbitDistance=THREE.MathUtils.clamp(orbitDistance+e.deltaY*.015,6,28);},{passive:true});
+
+function update(dt){
+  if(!gameStarted){
+    menuTime+=dt;
+    const shotIndex=Math.floor(menuTime/8)%menuShots.length;
+    const nextIndex=(shotIndex+1)%menuShots.length;
+    const blend=(menuTime%8)/8;
+    const smooth=blend*blend*(3-2*blend);
+    camera.position.lerpVectors(menuShots[shotIndex].p,menuShots[nextIndex].p,smooth);
+    const look=new THREE.Vector3().lerpVectors(menuShots[shotIndex].t,menuShots[nextIndex].t,smooth);
+    camera.lookAt(look);
+    return;
+  }
+  const forward=keys.w||keys.arrowup, reverse=keys.s||keys.arrowdown;
+  const braking=keys[' '];
+  const maxSpeed=13;
+  if(forward)speed=Math.min(maxSpeed,speed+dt*7);
+  else if(reverse)speed=Math.max(-maxSpeed*.45,speed-dt*5);
+  else speed*=Math.pow(.90,dt*10);
+  if(braking)speed*=Math.pow(.08,dt*5);
+  const steerInput=(keys.a||keys.arrowleft?1:0)-(keys.d||keys.arrowright?1:0);
+  steer=THREE.MathUtils.damp(steer,steerInput,7,dt);
+  const turnFactor=Math.min(1,Math.abs(speed)/2);
+  active.rotation.y += steer*dt*1.8*turnFactor*(speed>=0?1:-1);
+  const dir=new THREE.Vector3(-Math.sin(active.rotation.y),0,-Math.cos(active.rotation.y));
+  active.position.addScaledVector(dir,speed*dt);
+  active.position.x=THREE.MathUtils.clamp(active.position.x,-115,115);
+  active.position.z=THREE.MathUtils.clamp(active.position.z,-115,115);
+  active.userData.wheels.forEach(w=>w.rotation.x+=speed*dt*1.5);
+  active.userData.steering.rotation.z=steer*.65;
+  vehicleSystem.updateWork(dt);
+
+  const orbitAngle=active.rotation.y+orbitYaw+Math.PI;
+  const horizontal=Math.cos(orbitPitch)*orbitDistance;
+  const desired=new THREE.Vector3(
+    active.position.x+Math.sin(orbitAngle)*horizontal,
+    active.position.y+2.4+Math.sin(orbitPitch)*orbitDistance,
+    active.position.z+Math.cos(orbitAngle)*horizontal
+  );
+  camera.position.lerp(desired,1-Math.pow(.0005,dt));
+  targetVec.copy(active.position).add(new THREE.Vector3(0,1.6,0));
+  camera.lookAt(targetVec);
+  document.getElementById('speed').textContent=Math.round(Math.abs(speed)*3.6);
+  document.getElementById('money').textContent=money.toLocaleString();
+  const pct=Math.round(fieldCells.filter(c=>c.state==='harvested').length/fieldCells.length*100);
+  document.getElementById('mown').textContent=pct+'%';
+  document.getElementById('progress').style.width=pct+'%';
+  document.getElementById('rpm').textContent='RPM '+Math.round(900+Math.abs(speed)*110);
+  document.getElementById('mapplayer').style.transform='rotate('+(-active.rotation.y*180/Math.PI)+'deg)';
+
+}
+function animate(){
+  requestAnimationFrame(animate);
+  const dt=Math.min(clock.getDelta(),.04);
+  update(dt);
+  renderer.render(scene,camera);
+}
+animate();
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+</script>
+</body>
+</html>
++(4500-money).toLocaleString()+' more');return;}money-=4500;farmTrailer=makeTrailer();farmTrailer.position.set(0,0,3.35);tractor.add(farmTrailer);trailerOwned=true;document.getElementById('buyTrailer').textContent='OWNED';document.getElementById('dealerShop').style.display='none';say('Farm trailer purchased and hitched to your tractor!');};
+for(const [type,id,price] of [['plow','buyPlow',150],['seeder','buySeeder',200],['harvester','buyHarvester',250]])document.getElementById(id).onclick=()=>{if(money<price){say('Need 
+addEventListener('keydown',e=>{
+  if(e.repeat)return;
+  const key=e.key.toLowerCase();
+  if(key==='u'){
+    if(Math.hypot(active.position.x-111,active.position.z)<22){document.getElementById('dealerShop').style.display='flex';return;}
+    const field=extraFields.find(f=>Math.hypot(active.position.x-f.x,active.position.z-(f.z+f.size/2+3))<15);
+    if(field){
+      if(field.unlocked)say(field.name+' already unlocked');
+      else if(money>=field.cost){money-=field.cost;field.unlocked=true;say(field.name+' unlocked!');}
+      else say('Need $'+(field.cost-money).toLocaleString()+' more for '+field.name);
+    } else say('Drive to a field gate and press U to unlock it');
+  }
+  if(key==='f'){blades=!blades;bladeGroup.visible=blades;say(blades?'Rear harvester lowered':'Rear harvester raised');}
+  if(key==='c'){orbitYaw=0;orbitPitch=.32;orbitDistance=13;say('Camera reset');}
+});
+// Start parked inside the garage, lined up to drive west through the gate into the field.
+tractor.position.set(64,0,0);
+tractor.rotation.y = Math.PI/2;
+const clock=new THREE.Clock();
+let gameStarted=false, menuTime=0;
+const menuShots=[
+  {p:new THREE.Vector3(88,18,34),t:new THREE.Vector3(28,2,0)},
+  {p:new THREE.Vector3(18,27,91),t:new THREE.Vector3(16,1,48)},
+  {p:new THREE.Vector3(-48,20,36),t:new THREE.Vector3(0,1,0)}
+];
+camera.position.copy(menuShots[0].p);camera.lookAt(menuShots[0].t);
+document.getElementById('play').onclick=()=>{
+  document.getElementById('start').style.display='none';
+  document.getElementById('hud').style.display='block';
+  gameStarted=true;
+};
+const targetVec=new THREE.Vector3();
+let orbitYaw=0, orbitPitch=0.32, orbitDistance=13, dragging=false, lastPointerX=0, lastPointerY=0;
+renderer.domElement.style.cursor='grab';
+renderer.domElement.addEventListener('pointerdown',e=>{dragging=true;lastPointerX=e.clientX;lastPointerY=e.clientY;renderer.domElement.setPointerCapture(e.pointerId);renderer.domElement.style.cursor='grabbing';});
+renderer.domElement.addEventListener('pointermove',e=>{if(!dragging)return;orbitYaw-=(e.clientX-lastPointerX)*.006;orbitPitch=THREE.MathUtils.clamp(orbitPitch+(e.clientY-lastPointerY)*.004,-.15,1.05);lastPointerX=e.clientX;lastPointerY=e.clientY;});
+renderer.domElement.addEventListener('pointerup',()=>{dragging=false;renderer.domElement.style.cursor='grab';});
+renderer.domElement.addEventListener('wheel',e=>{orbitDistance=THREE.MathUtils.clamp(orbitDistance+e.deltaY*.015,6,28);},{passive:true});
+
+function update(dt){
+  if(!gameStarted){
+    menuTime+=dt;
+    const shotIndex=Math.floor(menuTime/8)%menuShots.length;
+    const nextIndex=(shotIndex+1)%menuShots.length;
+    const blend=(menuTime%8)/8;
+    const smooth=blend*blend*(3-2*blend);
+    camera.position.lerpVectors(menuShots[shotIndex].p,menuShots[nextIndex].p,smooth);
+    const look=new THREE.Vector3().lerpVectors(menuShots[shotIndex].t,menuShots[nextIndex].t,smooth);
+    camera.lookAt(look);
+    return;
+  }
+  const forward=keys.w||keys.arrowup, reverse=keys.s||keys.arrowdown;
+  const braking=keys[' '];
+  const maxSpeed=13;
+  if(forward)speed=Math.min(maxSpeed,speed+dt*7);
+  else if(reverse)speed=Math.max(-maxSpeed*.45,speed-dt*5);
+  else speed*=Math.pow(.90,dt*10);
+  if(braking)speed*=Math.pow(.08,dt*5);
+  const steerInput=(keys.a||keys.arrowleft?1:0)-(keys.d||keys.arrowright?1:0);
+  steer=THREE.MathUtils.damp(steer,steerInput,7,dt);
+  const turnFactor=Math.min(1,Math.abs(speed)/2);
+  active.rotation.y += steer*dt*1.8*turnFactor*(speed>=0?1:-1);
+  const dir=new THREE.Vector3(-Math.sin(active.rotation.y),0,-Math.cos(active.rotation.y));
+  active.position.addScaledVector(dir,speed*dt);
+  active.position.x=THREE.MathUtils.clamp(active.position.x,-115,115);
+  active.position.z=THREE.MathUtils.clamp(active.position.z,-115,115);
+  active.userData.wheels.forEach(w=>w.rotation.x+=speed*dt*1.5);
+  active.userData.steering.rotation.z=steer*.65;
+  if(blades){
+    // Harvest the wide strip directly behind the tractor's rear attachment.
+    const deckX=active.position.x-Math.sin(active.rotation.y)*2.65;
+    const deckZ=active.position.z-Math.cos(active.rotation.y)*2.65;
+    for(const tuft of grassTufts){
+      if(tuft.cut || (tuft.field && !tuft.field.unlocked))continue;
+      const dx=tuft.x-deckX, dz=tuft.z-deckZ;
+      const localX=dx*Math.cos(active.rotation.y)-dz*Math.sin(active.rotation.y);
+      const localZ=dx*Math.sin(active.rotation.y)+dz*Math.cos(active.rotation.y);
+      if(Math.abs(localX)<2.9 && Math.abs(localZ)<.72){
+        tuft.cut=true;
+        cropDummy.position.set(tuft.x,.055,tuft.z); cropDummy.rotation.set(0,0,0); cropDummy.scale.set(1,.10,1); cropDummy.updateMatrix();
+        tuft.mesh?.setMatrixAt(tuft.index,cropDummy.matrix); wheatInstances.setMatrixAt(tuft.index,cropDummy.matrix); wheatInstances.instanceMatrix.needsUpdate=true;
+        cutGrass++; money += 8;
+      }
+    }
+  }
+  const orbitAngle=active.rotation.y+orbitYaw+Math.PI;
+  const horizontal=Math.cos(orbitPitch)*orbitDistance;
+  const desired=new THREE.Vector3(
+    active.position.x+Math.sin(orbitAngle)*horizontal,
+    active.position.y+2.4+Math.sin(orbitPitch)*orbitDistance,
+    active.position.z+Math.cos(orbitAngle)*horizontal
+  );
+  camera.position.lerp(desired,1-Math.pow(.0005,dt));
+  targetVec.copy(active.position).add(new THREE.Vector3(0,1.6,0));
+  camera.lookAt(targetVec);
+  document.getElementById('speed').textContent=Math.round(Math.abs(speed)*3.6);
+  document.getElementById('money').textContent=money.toLocaleString();
+  const pct=Math.round(cutGrass/totalGrass*100);
+  document.getElementById('mown').textContent=pct+'%';
+  document.getElementById('progress').style.width=pct+'%';
+  document.getElementById('rpm').textContent='RPM '+Math.round(900+Math.abs(speed)*110);
+  document.getElementById('mapplayer').style.transform='rotate('+(-active.rotation.y*180/Math.PI)+'deg)';
+
+}
+function animate(){
+  requestAnimationFrame(animate);
+  const dt=Math.min(clock.getDelta(),.04);
+  update(dt);
+  renderer.render(scene,camera);
+}
+animate();
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+</script>
+</body>
+</html>
++(price-money)+' more');return;}money-=price;vehicleSystem.addImplement(type);document.getElementById('dealerShop').style.display='none';};
 addEventListener('keydown',e=>{
   if(e.repeat)return;
   const key=e.key.toLowerCase();
