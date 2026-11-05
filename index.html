@@ -83,6 +83,7 @@
 
 <script type="module">
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+import { RoundedBoxGeometry } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/geometries/RoundedBoxGeometry.js';
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xf5a16b);
@@ -171,7 +172,9 @@ const whiteMat = mat(0xf2ead6), blackMat = mat(0x242a27), yellowMat = mat(0xe4b8
 const blueMat = mat(0x397fbd), glassMat = new THREE.MeshPhysicalMaterial({color:0x9bd5df,roughness:.08,metalness:.05,transparent:true,opacity:.3,transmission:.75,thickness:.12,depthWrite:false,side:THREE.DoubleSide});
 
 function box(parent, x,y,z, sx,sy,sz, material, cast=true) {
-  const m = new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz), material);
+  const bevel=Math.max(.008,Math.min(sx,sy,sz)*.12);
+  const geometry=new RoundedBoxGeometry(sx,sy,sz,2,Math.min(bevel,Math.min(sx,sy,sz)*.22));
+  const m = new THREE.Mesh(geometry, material);
   m.position.set(x,y,z); m.castShadow=cast; m.receiveShadow=true; parent.add(m); return m;
 }
 function cylinder(parent, x,y,z, r1,r2,h, material, segments=8, rotX=0) {
@@ -179,9 +182,32 @@ function cylinder(parent, x,y,z, r1,r2,h, material, segments=8, rotX=0) {
   m.position.set(x,y,z); m.rotation.x=rotX; m.castShadow=true; m.receiveShadow=true; parent.add(m); return m;
 }
 
-// Ground and rolling low-poly hills
-const ground = new THREE.Mesh(new THREE.PlaneGeometry(260,260,50,50), grassMat);
-ground.rotation.x=-Math.PI/2; ground.position.y=-.18; ground.receiveShadow=true; scene.add(ground);
+// Real displaced terrain: mesh vertices rise and fall, not just a texture.
+// Keep the main working field level so existing crop and implement logic stays aligned.
+function terrainHeight(x,z){
+  const fade=THREE.MathUtils.smoothstep(Math.max(Math.abs(x),Math.abs(z)),47,72);
+  const broad=Math.sin(x*.052+1.2)*1.05+Math.cos(z*.047-.7)*.9+Math.sin((x+z)*.031)*1.15+Math.cos((x-z)*.024)*.75;
+  const detail=Math.sin(x*.19+z*.11)*.16+Math.cos(z*.17-x*.08)*.13;
+  return (broad+detail)*fade;
+}
+function groundHeightAt(x,z){return -.18+terrainHeight(x,z);}
+const groundGeometry=new THREE.PlaneGeometry(260,260,180,180);
+const groundPos=groundGeometry.attributes.position;
+for(let i=0;i<groundPos.count;i++){
+  const x=groundPos.getX(i),z=-groundPos.getY(i);
+  groundPos.setZ(i,terrainHeight(x,z));
+}
+groundGeometry.computeVertexNormals();
+const ground = new THREE.Mesh(groundGeometry, grassMat);
+ground.rotation.x=-Math.PI/2;ground.position.y=-.18;ground.receiveShadow=true;scene.add(ground);
+// Raised earth contours catch light and create physical surface relief.
+const contourMat=mat(0x719d50);
+for(let i=0;i<28;i++){
+  const x=-118+(i*37)%236,z=-112+((i*61)%224);
+  const ridge=new THREE.Mesh(new THREE.TorusGeometry(5+(i%4)*1.8,.11,5,48),contourMat);
+  ridge.rotation.x=Math.PI/2;ridge.scale.set(1.35,.72,1);ridge.position.set(x,groundHeightAt(x,z)+.035,z);
+  ridge.castShadow=false;ridge.receiveShadow=true;scene.add(ridge);
+}
 const hillMat = mat(0x6eaa58);
 for(let i=0;i<18;i++){
   const a=i/18*Math.PI*2, r=75+(i%3)*12;
@@ -193,6 +219,13 @@ const FIELD_W = 92, FIELD_D = 92;
 const fieldSoilMat=mat(0x8c7845);fieldSoilMat.map=makeSurfaceTexture('#88734a','#c2a36c',10000);
 const fieldSoil = new THREE.Mesh(new THREE.PlaneGeometry(FIELD_W, FIELD_D), fieldSoilMat);
 fieldSoil.rotation.x = -Math.PI/2; fieldSoil.position.set(0, -.04, 0); scene.add(fieldSoil);
+// Raised 3D soil rows beneath the crop, not a painted-on furrow texture.
+const furrowMat=mat(0x80633f);
+for(let i=0;i<27;i++){
+  const furrow=new THREE.Mesh(new THREE.CylinderGeometry(.075,.11,FIELD_D-.8,8),furrowMat);
+  furrow.rotation.x=Math.PI/2;furrow.position.set(-FIELD_W/2+.9+i*(FIELD_W-1.8)/26,-.005,0);
+  furrow.receiveShadow=true;furrow.castShadow=false;scene.add(furrow);
+}
 const fieldEdge = new THREE.Mesh(new THREE.PlaneGeometry(FIELD_W+5, FIELD_D+5), mat(0x65984a));
 fieldEdge.rotation.x=-Math.PI/2; fieldEdge.position.set(0,-.08,0); scene.add(fieldEdge);
 
@@ -526,6 +559,7 @@ class VehicleSystem{
  detachImplement(){if(!this.attached)return;const p=new THREE.Vector3();this.attached.getWorldPosition(p);this.attached.parent.remove(this.attached);this.scene.add(this.attached);this.attached.position.copy(p);this.attached.userData.isAttached=false;this.attached.userData.isLowered=false;this.attached=null;}
  toggleImplementHeight(){const t=this.attached;if(!t)return;t.userData.isLowered=!t.userData.isLowered;t.userData.targetY=t.userData.isLowered?-.5:0;say(t.userData.isLowered?"Implement lowered":"Implement raised");}
  updateWork(dt){
+  for(const cell of fieldCells)if(cell.state==="seeded"&&performance.now()>=cell.growAt)setCellState(cell,"growing");
   const tool=this.attached;if(!tool)return;tool.position.y=THREE.MathUtils.damp(tool.position.y,tool.userData.targetY,8,dt);
   if(!tool.userData.isLowered||Math.abs(tool.position.y-tool.userData.targetY)>.06)return;
   const type=tool.userData.type,q=new THREE.Quaternion();tool.getWorldQuaternion(q);
@@ -535,7 +569,6 @@ class VehicleSystem{
    else if(type==="seeder"&&cell.state==="plowed"){setCellState(cell,"seeded");cell.growAt=performance.now()+10000;}
    else if(type==="harvester"&&cell.state==="growing"){setCellState(cell,"harvested");this.grain+=250;}
   }
-  for(const cell of fieldCells)if(cell.state==="seeded"&&performance.now()>=cell.growAt)setCellState(cell,"growing");
   document.getElementById("grainAmount").textContent=this.grain.toLocaleString();
  }
 }
@@ -612,6 +645,7 @@ function update(dt){
   active.position.addScaledVector(dir,speed*dt);
   active.position.x=THREE.MathUtils.clamp(active.position.x,-115,115);
   active.position.z=THREE.MathUtils.clamp(active.position.z,-115,115);
+  active.position.y=groundHeightAt(active.position.x,active.position.z)+.18;
   active.userData.wheels.forEach(w=>w.rotation.x+=speed*dt*1.5);
   active.userData.steering.rotation.z=steer*.65;
   vehicleSystem.updateWork(dt);
